@@ -1,0 +1,241 @@
+/* Category project pages (Branding / Social / Web Design / Other) — light
+   theme, scrollable grid of project thumbnails, separate from the dark
+   keychain-cluster home page which keeps its own page.css. */
+
+@font-face {
+  font-family: "Ouma Devanagari";
+  src: url("assets/font1/fonnts.com-Ouma_Devanagari_Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ouma Devanagari";
+  src: url("assets/font1/fonnts.com-Ouma_Devanagari_Medium-1.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ouma Devanagari";
+  src: url("assets/font1/fonnts.com-Ouma_Devanagari_SemiBold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ouma Devanagari";
+  src: url("assets/font1/fonnts.com-Ouma_Devanagari_Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Ouma Devanagari";
+  src: url("assets/font1/fonnts.com-Ouma_Devanagari_Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Alte Haas Grotesk";
+  src: url("assets/font2/AlteHaasGroteskRegular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  min-height: 100vh;
+}
+
+body {
+  background: #ececee;
+  color: #1a1a1a;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow-x: hidden;
+}
+
+.back-button {
+  position: fixed;
+  top: 1.5rem;
+  left: 1.5rem;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.9rem;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 999px;
+  background: transparent;
+  text-decoration: none;
+  color: #1a1a1a;
+}
+
+.back-icon {
+  font-family: "Ouma Devanagari", sans-serif;
+  font-weight: 400;
+  font-size: 1rem;
+  line-height: 1;
+  transition: font-weight 0.25s ease;
+}
+
+/* same reversible bold-on-interaction treatment as the CTA button below */
+.back-button:hover .back-icon,
+.back-button:focus-visible .back-icon,
+.back-button:active .back-icon {
+  font-weight: 700;
+}
+
+.project-grid {
+  max-width: 1000px;
+  margin: 6rem auto 0;
+  padding: 0 2rem;
+}
+
+.project-grid .grid-inner {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  background: #c9cacc;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.project-grid .tile {
+  aspect-ratio: 0.85;
+  background: #4a4a4a;
+}
+
+.project-cta {
+  display: flex;
+  justify-content: center;
+  margin: 2.5rem 0 5rem;
+}
+
+.cta-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.cta-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.1rem;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              padding 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              gap 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.cta-label {
+  font-family: "Ouma Devanagari", sans-serif;
+  font-weight: 400;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  transition: font-weight 0.25s ease,
+              font-size 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              letter-spacing 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* +10% over the original 18px / 11px */
+.cta-icon {
+  width: 19.8px;
+  height: 19.8px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Ouma Devanagari", sans-serif;
+  font-weight: 400;
+  font-size: 12.1px;
+  line-height: 1;
+  color: #1a1a1a;
+  transition: font-weight 0.25s ease, opacity 0.4s ease, transform 0.4s ease;
+}
+
+/* bold while hovered or pressed, back to regular the instant you release
+   or move away — reversible, and only while still a pill (not yet opened). */
+.cta-button:not(.is-open):hover .cta-label,
+.cta-button:not(.is-open):focus-visible .cta-label,
+.cta-button:not(.is-open):active .cta-label,
+.cta-button:not(.is-open):hover .cta-icon,
+.cta-button:not(.is-open):focus-visible .cta-icon,
+.cta-button:not(.is-open):active .cta-icon {
+  font-weight: 700;
+}
+
+/* the small line that appears once the button unwraps into a bare title */
+.cta-subtitle {
+  font-family: "Alte Haas Grotesk", sans-serif;
+  font-size: 0.85rem;
+  color: rgba(26, 26, 26, 0.6);
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  overflow: hidden;
+  transition: opacity 0.5s ease 0.15s, transform 0.5s ease 0.15s,
+              max-height 0.5s cubic-bezier(0.22, 1, 0.36, 1), margin-top 0.5s ease;
+}
+
+/* click: box disappears, title grows into a bare heading, subtitle fades
+   in below it. Toggles back to the pill on a second click. */
+.cta-button.is-open {
+  gap: 0;
+  border-color: transparent;
+  background: transparent;
+  padding: 0.6rem 0;
+  cursor: pointer;
+}
+
+.cta-button.is-open .cta-label {
+  font-size: 2rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+/* collapsed out of the layout (not just faded) so the label is the only
+   box left and its centering matches the subtitle's below exactly. */
+.cta-button.is-open .cta-icon {
+  width: 0;
+  border-width: 0;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: font-weight 0.25s ease, opacity 0.3s ease, transform 0.3s ease,
+              width 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-width 0.4s ease;
+}
+
+.cta-wrap.is-open .cta-subtitle {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 2rem;
+  margin-top: 0.5rem;
+}
+
+@media (max-width: 700px) {
+  .project-grid .grid-inner {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

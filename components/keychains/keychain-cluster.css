@@ -1,0 +1,153 @@
+/* ==========================================================================
+   Keychain cluster — isolated component
+   Stack: BG.png (static) + 4 clickable tag overlays (Branding/Social/Web/Star)
+   Drop this folder + the <div class="keychain-cluster">…</div> markup into
+   any page and link this file to reuse the interaction as-is.
+   ========================================================================== */
+
+.keychain-cluster {
+  position: fixed;
+  top: 0;
+  right: clamp(1rem, 18.44vw, 20.53rem);
+  width: clamp(358px, 50.61vw, 974px);
+  z-index: 50;
+  pointer-events: none;
+}
+
+.keychain-canvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  transform: translateY(-20%);
+  perspective: 1400px;
+  pointer-events: auto;
+}
+
+/* static base — carabiner, ring & keys. Never animates. */
+.kc-bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  z-index: 1;
+}
+
+.kc-item {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 2;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+.kc-item:focus-visible {
+  outline: none;
+}
+
+.kc-item.is-active,
+.kc-item.is-selected {
+  z-index: 3;
+}
+
+.kc-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+
+  --rx: 0deg;
+  --ry: 0deg;
+  --tz: 0px;
+  --sx: 0px;
+  --sy: 14px;
+  --sb: 20px;
+  --sa: 0.28;
+
+  /* pivot near the hanging point (top), not the center: the top stays put
+     and only the bottom swings outward/forward on hover, instead of the
+     top receding to compensate. */
+  transform-origin: 50% 30%;
+  transform: rotateX(var(--rx)) rotateY(var(--ry)) translateZ(var(--tz));
+  filter: drop-shadow(var(--sx) var(--sy) var(--sb) rgba(0, 0, 0, var(--sa)))
+          drop-shadow(0 0 0px transparent);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+              filter 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: transform, filter;
+}
+
+/* persistent selection glow — independent of hover tilt */
+.kc-item.is-selected .kc-img {
+  filter: drop-shadow(var(--sx) var(--sy) var(--sb) rgba(0, 0, 0, var(--sa)))
+          drop-shadow(0 0 1.5px rgba(255, 255, 255, 0.55));
+}
+
+/* hover shine — radial highlight that tracks the pointer, clipped to the
+   tag's own silhouette so it never spills onto the transparent canvas */
+.kc-glare {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%),
+              rgba(255, 255, 255, 0.5), transparent 30%);
+  mix-blend-mode: screen;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  -webkit-mask-image: var(--mask-src);
+  mask-image: var(--mask-src);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+}
+
+.kc-item.is-active .kc-glare {
+  opacity: 0.2;
+}
+
+/* WEB-KC's pale blue reads much brighter than the others under the same
+   screen-blend glare (light base color + screen mode washes out further),
+   so it gets a lower ceiling to look even with STAR/SOCIAL/BRANDING. */
+.kc-item[data-key="web"].is-active .kc-glare {
+  opacity: 0.1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kc-img,
+  .kc-glare {
+    transition-duration: 0.05s;
+  }
+}
+
+/* Tablet */
+@media (max-width: 900px) {
+  .keychain-cluster {
+    width: clamp(149px, 18.62vw, 218px);
+    right: clamp(0.75rem, 7.7vw, 4.66rem);
+  }
+}
+
+/* Phone */
+@media (max-width: 600px) {
+  .keychain-cluster {
+    width: clamp(117px, 35.85vw, 171px);
+    right: clamp(0.5rem, 12vw, 3.45rem);
+  }
+}

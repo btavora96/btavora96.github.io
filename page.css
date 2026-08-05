@@ -1,0 +1,76 @@
+/* Shared page shell — dark background + basic typography for every page
+   in the site (the keychains demo and the 4 category pages). */
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  min-height: 100vh;
+}
+
+body {
+  /* solid fallback matches the photo's darkest tone, so on aspect ratios
+     narrower than the source photo (which "cover" would otherwise zoom/
+     crop hard to fill) any sliver left uncovered reads as more background
+     instead of a crop. Only safe down to roughly a 1.2 aspect ratio —
+     narrower than that (phones in portrait) needs plain cover instead,
+     see the media query below. */
+  background-color: #06060f;
+  background-image: url("assets/page-bg.png");
+  background-size: 130% auto;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  overflow-x: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #f2f2f7;
+}
+
+@media (max-width: 600px) {
+  body {
+    background-size: cover;
+    background-attachment: scroll;
+  }
+}
+
+.back-link {
+  position: fixed;
+  top: 1.5rem;
+  left: 1.5rem;
+  z-index: 60;
+  color: #f2f2f7;
+  text-decoration: none;
+  font-size: 0.95rem;
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.back-link:hover,
+.back-link:focus-visible {
+  opacity: 1;
+}
+
+.page-content {
+  position: relative;
+  z-index: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 8rem 2rem 6rem;
+}
+
+.page-content h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  margin: 0 0 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.page-content p {
+  font-size: 1.05rem;
+  line-height: 1.6;
+  color: rgba(242, 242, 247, 0.75);
+  max-width: 60ch;
+}
