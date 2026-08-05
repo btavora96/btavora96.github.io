@@ -118,6 +118,80 @@ body {
   background: #4a4a4a;
 }
 
+/* Stacked gallery variant: real project thumbnails, one per row at full
+   width (free height each), in place of the fixed-aspect placeholder grid
+   above (still used by the category pages whose gallery hasn't been
+   uploaded yet). */
+.grid-inner.grid-inner--stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: transparent;
+  box-shadow: none;
+}
+
+.gallery-item {
+  width: 100%;
+  margin-bottom: 4rem;
+  text-align: center;
+}
+
+.gallery-item:last-child {
+  margin-bottom: 0;
+}
+
+.gallery-item img {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: #4a4a4a;
+}
+
+.gallery-caption {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  padding: 0.6rem 1.1rem;
+  border: 1.5px solid #1a1a1a;
+  border-radius: 999px;
+}
+
+.gallery-label {
+  font-family: "Ouma Devanagari", sans-serif;
+  font-weight: 400;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+  transition: font-weight 0.25s ease;
+}
+
+.gallery-icon {
+  width: 19.8px;
+  height: 19.8px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Ouma Devanagari", sans-serif;
+  font-weight: 400;
+  font-size: 12.1px;
+  line-height: 1;
+  color: #1a1a1a;
+  transition: font-weight 0.25s ease;
+}
+
+/* hovering the thumbnail bolds its name below, same treatment as the
+   other buttons on this page */
+.gallery-item:hover .gallery-label,
+.gallery-item:focus-within .gallery-label,
+.gallery-item:hover .gallery-icon,
+.gallery-item:focus-within .gallery-icon {
+  font-weight: 700;
+}
+
 .project-cta {
   display: flex;
   justify-content: center;
