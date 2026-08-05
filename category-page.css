@@ -70,8 +70,8 @@ body {
 
 .back-button {
   position: fixed;
-  top: 1.5rem;
-  left: 1.5rem;
+  top: 6rem; /* matches .project-grid's margin-top, so it lines up with the top of the first gallery image/tile */
+  left: 1.77rem; /* 1.5rem + 10% of the button's own ~43px width */
   z-index: 10;
   display: inline-flex;
   align-items: center;
@@ -144,7 +144,6 @@ body {
   display: block;
   width: 100%;
   height: auto;
-  background: #4a4a4a;
 }
 
 .gallery-caption {
@@ -155,6 +154,12 @@ body {
   padding: 0.6rem 1.1rem;
   border: 1.5px solid #1a1a1a;
   border-radius: 999px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              padding 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              gap 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .gallery-label {
@@ -164,9 +169,12 @@ body {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #1a1a1a;
-  transition: font-weight 0.25s ease;
+  transition: font-weight 0.25s ease,
+              font-size 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              letter-spacing 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* +10% over the original 18px / 11px, matching the page-level CTA icon */
 .gallery-icon {
   width: 19.8px;
   height: 19.8px;
@@ -180,16 +188,62 @@ body {
   font-size: 12.1px;
   line-height: 1;
   color: #1a1a1a;
-  transition: font-weight 0.25s ease;
+  transition: font-weight 0.25s ease, opacity 0.3s ease, transform 0.3s ease,
+              width 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-width 0.4s ease;
 }
 
-/* hovering the thumbnail bolds its name below, same treatment as the
-   other buttons on this page */
-.gallery-item:hover .gallery-label,
-.gallery-item:focus-within .gallery-label,
-.gallery-item:hover .gallery-icon,
-.gallery-item:focus-within .gallery-icon {
+/* hovering/focusing the thumbnail bolds its name below — reversible, and
+   only while still a pill (not yet unwrapped). */
+.gallery-item:not(.is-open):hover .gallery-label,
+.gallery-item:not(.is-open):focus-within .gallery-label,
+.gallery-caption:active .gallery-label,
+.gallery-item:not(.is-open):hover .gallery-icon,
+.gallery-item:not(.is-open):focus-within .gallery-icon,
+.gallery-caption:active .gallery-icon {
   font-weight: 700;
+}
+
+/* the small line that appears once the caption unwraps into a bare title */
+.gallery-subtitle {
+  font-family: "Alte Haas Grotesk", sans-serif;
+  font-size: 0.85rem;
+  color: rgba(26, 26, 26, 0.6);
+  max-height: 0;
+  margin-top: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  overflow: hidden;
+  transition: opacity 0.5s ease 0.15s, transform 0.5s ease 0.15s,
+              max-height 0.5s cubic-bezier(0.22, 1, 0.36, 1), margin-top 0.5s ease;
+}
+
+/* click: box disappears, name grows into a bare heading, subtitle fades
+   in below it. Toggles back to the pill on a second click. */
+.gallery-caption.is-open {
+  gap: 0;
+  border-color: transparent;
+  background: transparent;
+  padding: 0.6rem 0;
+}
+
+.gallery-caption.is-open .gallery-label {
+  font-size: 2rem;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.gallery-caption.is-open .gallery-icon {
+  width: 0;
+  border-width: 0;
+  opacity: 0;
+  transform: scale(0.4);
+}
+
+.gallery-item.is-open .gallery-subtitle {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 2rem;
+  margin-top: 0.5rem;
 }
 
 .project-cta {
