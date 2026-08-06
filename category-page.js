@@ -10,6 +10,11 @@
  * downloading/playing once their project scrolls into view, and pause
  * again once it scrolls out — keeps a page with several video projects
  * from trying to load them all at once.
+ *
+ * Gallery frames (.gallery-frame-wrap, Web Design) can hold several
+ * stacked page screenshots; the prev/next arrows swap which one has
+ * .is-active (and is therefore visible/scrollable) and reset the
+ * frame's scroll position back to the top.
  */
 (function () {
   "use strict";
@@ -54,6 +59,33 @@
     });
   }
 
+  function wireGalleryFrames() {
+    document.querySelectorAll(".gallery-frame-wrap").forEach(function (wrap) {
+      var frame = wrap.querySelector(".gallery-frame");
+      var prev = wrap.querySelector(".gallery-frame-arrow--prev");
+      var next = wrap.querySelector(".gallery-frame-arrow--next");
+      if (!frame || (!prev && !next)) return;
+
+      var slides = Array.prototype.slice.call(frame.querySelectorAll("img, .gallery-video"));
+      if (slides.length < 2) return;
+
+      var index = slides.findIndex(function (slide) {
+        return slide.classList.contains("is-active");
+      });
+      if (index < 0) index = 0;
+
+      function show(newIndex) {
+        slides[index].classList.remove("is-active");
+        index = (newIndex + slides.length) % slides.length;
+        slides[index].classList.add("is-active");
+        frame.scrollTop = 0;
+      }
+
+      if (prev) prev.addEventListener("click", function () { show(index - 1); });
+      if (next) next.addEventListener("click", function () { show(index + 1); });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     wireToggle(document.querySelector(".cta-button"), document.querySelector(".cta-wrap"));
 
@@ -62,5 +94,6 @@
     });
 
     wireVideoAutoplay();
+    wireGalleryFrames();
   });
 })();
