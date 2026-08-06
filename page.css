@@ -20,7 +20,7 @@ body {
      narrower than that (phones in portrait) needs plain cover instead,
      see the media query below. */
   background-color: #06060f;
-  background-image: url("assets/page-bg.png");
+  background-image: url("assets/page-bg.webp");
   background-size: 130% auto;
   background-position: center;
   background-repeat: no-repeat;

@@ -24,10 +24,10 @@
   var ALPHA_THRESHOLD = 10;
 
   var TAGS = [
-    { key: "web", file: "WEB-KC.png", label: "Web Design — ver projetos", href: "webdesign.html" },
-    { key: "star", file: "STAR-KC.png", label: "Others — ver projetos", href: "other.html" },
-    { key: "branding", file: "BRANDING-KC.png", label: "Branding — ver projetos", href: "branding.html" },
-    { key: "social", file: "SOCIAL-KC.png", label: "Social Media — ver projetos", href: "social.html" }
+    { key: "web", file: "WEB-KC.webp", label: "Web Design — ver projetos", href: "webdesign.html" },
+    { key: "star", file: "STAR-KC.webp", label: "Others — ver projetos", href: "other.html" },
+    { key: "branding", file: "BRANDING-KC.webp", label: "Branding — ver projetos", href: "branding.html" },
+    { key: "social", file: "SOCIAL-KC.webp", label: "Social Media — ver projetos", href: "social.html" }
   ];
 
   // Approximate bounding box (canvas-relative 0..1) for each tag's own
@@ -85,7 +85,7 @@
 
     var bg = document.createElement("img");
     bg.className = "kc-bg";
-    bg.src = ASSET_BASE + "BG.png";
+    bg.src = ASSET_BASE + "BG.webp";
     bg.alt = "";
     bg.setAttribute("aria-hidden", "true");
     bg.draggable = false;

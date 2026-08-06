@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Home</title>
+  <!-- The keychain images are only requested once keychain-cluster.js runs
+       (it builds the <img> tags after DOMContentLoaded), so without a
+       preload hint the browser doesn't start fetching them until well
+       after CSS/JS have loaded — these let the preload scanner kick off
+       every image fetch immediately, in parallel, straight from <head>. -->
+  <link rel="preload" as="image" href="assets/page-bg.webp" type="image/webp" />
+  <link rel="preload" as="image" href="assets/keychains/BG.webp" type="image/webp" />
+  <link rel="preload" as="image" href="assets/keychains/BRANDING-KC.webp" type="image/webp" />
+  <link rel="preload" as="image" href="assets/keychains/SOCIAL-KC.webp" type="image/webp" />
+  <link rel="preload" as="image" href="assets/keychains/WEB-KC.webp" type="image/webp" />
+  <link rel="preload" as="image" href="assets/keychains/STAR-KC.webp" type="image/webp" />
+  <link rel="stylesheet" href="page.css?v=2" />
+  <link rel="stylesheet" href="components/keychains/keychain-cluster.css?v=1" />
+</head>
+<body>
+
+  <div class="keychain-cluster"></div>
+
+  <script src="components/keychains/keychain-cluster.js?v=2"></script>
+</body>
+</html>
