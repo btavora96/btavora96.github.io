@@ -86,14 +86,16 @@ body {
   width: 200vw;
   background-repeat: repeat-x;
   background-position: left center;
-  background-size: auto 2.5rem;
+  background-size: auto 2.75rem;
   animation: scroll-banner-x 3.2s linear infinite;
   will-change: transform;
 }
 
 @keyframes scroll-banner-x {
   from { transform: translateX(0); }
-  to { transform: translateX(calc(-40px * (638 / 137))); }
+  /* --tile-vb-w is the tile's cropped SVG viewBox width (set per page,
+     inline, alongside background-image); viewBox height is always 137. */
+  to { transform: translateX(calc(-44px * var(--tile-vb-w) / 137)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
