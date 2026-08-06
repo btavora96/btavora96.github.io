@@ -75,6 +75,10 @@ body {
    style. Animating transform (not background-position) keeps this on the
    compositor instead of repainting every frame. */
 .scroll-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 15;
   width: 100%;
   height: 4rem;
   overflow: hidden;
@@ -262,11 +266,11 @@ body {
 }
 
 .gallery-frame-arrow--prev {
-  left: -2.5rem;
+  left: -3.25rem;
 }
 
 .gallery-frame-arrow--next {
-  right: -2.5rem;
+  right: -3.25rem;
 }
 
 .gallery-caption {
