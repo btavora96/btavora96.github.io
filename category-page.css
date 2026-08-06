@@ -112,8 +112,8 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.55rem 0.9rem;
-  border: 1.5px solid #1a1a1a;
+  padding: 0.4rem 0.65rem;
+  border: 1.2px solid #1a1a1a;
   border-radius: 999px;
   background: transparent;
   text-decoration: none;
@@ -123,7 +123,7 @@ body {
 .back-icon {
   font-family: "Ouma Devanagari", sans-serif;
   font-weight: 400;
-  font-size: 1rem;
+  font-size: 0.75rem;
   line-height: 1;
   transition: font-weight 0.25s ease;
 }
@@ -190,14 +190,13 @@ body {
    area and unaffected. Projects with several page screenshots stack
    them all inside the same frame and toggle which one is visible via
    .is-active, so only one is ever in flow (and scrollable) at a time.
-   The wrap always reserves side gutters for the prev/next arrows —
-   even on single-image projects with no arrows — so every frame is
-   the same width regardless, and the arrows never sit over the image. */
+   The frame is always full width (same as a plain .gallery-item image
+   on the branding/social pages); the prev/next arrows sit outside it,
+   overhanging into the page's side margin via negative offsets, so
+   they never take width away from the frame or sit over the image. */
 .gallery-frame-wrap {
   position: relative;
   width: 100%;
-  padding: 0 3.75rem;
-  box-sizing: border-box;
 }
 
 .gallery-frame {
@@ -235,47 +234,48 @@ body {
   display: block;
 }
 
+/* same pill style, weight and sizing as .back-button, just positioned
+   outside the frame instead of fixed to the viewport */
 .gallery-frame-arrow {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 2.75rem;
-  height: 2.75rem;
-  border-radius: 50%;
-  border: 1.5px solid #1a1a1a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem 0.65rem;
+  border: 1.2px solid #1a1a1a;
+  border-radius: 999px;
   background: transparent;
   color: #1a1a1a;
   font-family: "Ouma Devanagari", sans-serif;
-  font-size: 1.1rem;
+  font-weight: 400;
+  font-size: 0.75rem;
   line-height: 1;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: font-weight 0.25s ease, background-color 0.25s ease;
+  transition: font-weight 0.25s ease;
 }
 
 .gallery-frame-arrow:hover,
 .gallery-frame-arrow:focus-visible {
   font-weight: 700;
-  background-color: rgba(26, 26, 26, 0.06);
 }
 
 .gallery-frame-arrow--prev {
-  left: 0;
+  left: -2.5rem;
 }
 
 .gallery-frame-arrow--next {
-  right: 0;
+  right: -2.5rem;
 }
 
 .gallery-caption {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 1.5rem;
-  padding: 0.6rem 1.1rem;
-  border: 1.5px solid #1a1a1a;
+  gap: 0.425rem;
+  margin-top: 1.8rem;
+  padding: 0.51rem 0.935rem;
+  border: 1.3px solid #1a1a1a;
   border-radius: 999px;
   background: transparent;
   cursor: pointer;
@@ -288,7 +288,7 @@ body {
 .gallery-label {
   font-family: "Ouma Devanagari", sans-serif;
   font-weight: 400;
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #1a1a1a;
@@ -297,18 +297,18 @@ body {
               letter-spacing 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* +10% over the original 18px / 11px, matching the page-level CTA icon */
+/* scaled ~15% down from a prior 19.8px/12.1px pass, matching the page-level CTA icon */
 .gallery-icon {
-  width: 19.8px;
-  height: 19.8px;
+  width: 16.8px;
+  height: 16.8px;
   border-radius: 50%;
-  border: 1.5px solid currentColor;
+  border: 1.3px solid currentColor;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: "Ouma Devanagari", sans-serif;
   font-weight: 400;
-  font-size: 12.1px;
+  font-size: 10.3px;
   line-height: 1;
   color: #1a1a1a;
   transition: font-weight 0.25s ease, opacity 0.3s ease, transform 0.3s ease,
@@ -350,7 +350,7 @@ body {
 }
 
 .gallery-caption.is-open .gallery-label {
-  font-size: 2rem;
+  font-size: 1.7rem;
   font-weight: 400;
   letter-spacing: 0.02em;
 }
@@ -385,9 +385,9 @@ body {
 .cta-button {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1.1rem;
-  border: 1.5px solid #1a1a1a;
+  gap: 0.425rem;
+  padding: 0.51rem 0.935rem;
+  border: 1.3px solid #1a1a1a;
   border-radius: 999px;
   background: transparent;
   cursor: pointer;
@@ -400,7 +400,7 @@ body {
 .cta-label {
   font-family: "Ouma Devanagari", sans-serif;
   font-weight: 400;
-  font-size: 0.85rem;
+  font-size: 0.72rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #1a1a1a;
@@ -409,18 +409,18 @@ body {
               letter-spacing 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* +10% over the original 18px / 11px */
+/* scaled ~15% down from a prior 19.8px/12.1px pass */
 .cta-icon {
-  width: 19.8px;
-  height: 19.8px;
+  width: 16.8px;
+  height: 16.8px;
   border-radius: 50%;
-  border: 1.5px solid currentColor;
+  border: 1.3px solid currentColor;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: "Ouma Devanagari", sans-serif;
   font-weight: 400;
-  font-size: 12.1px;
+  font-size: 10.3px;
   line-height: 1;
   color: #1a1a1a;
   transition: font-weight 0.25s ease, opacity 0.4s ease, transform 0.4s ease;
@@ -462,7 +462,7 @@ body {
 }
 
 .cta-button.is-open .cta-label {
-  font-size: 2rem;
+  font-size: 1.7rem;
   font-weight: 400;
   letter-spacing: 0.02em;
 }
