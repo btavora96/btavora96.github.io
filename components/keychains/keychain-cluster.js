@@ -85,6 +85,8 @@
 
     var bg = document.createElement("img");
     bg.className = "kc-bg";
+    bg.fetchPriority = "high";
+    bg.decoding = "sync";
     bg.src = ASSET_BASE + "BG.webp";
     bg.alt = "";
     bg.setAttribute("aria-hidden", "true");
@@ -100,6 +102,8 @@
 
       var img = document.createElement("img");
       img.className = "kc-img";
+      img.fetchPriority = "high";
+      img.decoding = "sync";
       img.src = ASSET_BASE + tag.file;
       img.alt = "";
       img.draggable = false;

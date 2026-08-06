@@ -9,12 +9,12 @@
        preload hint the browser doesn't start fetching them until well
        after CSS/JS have loaded — these let the preload scanner kick off
        every image fetch immediately, in parallel, straight from <head>. -->
-  <link rel="preload" as="image" href="assets/page-bg.webp" type="image/webp" />
-  <link rel="preload" as="image" href="assets/keychains/BG.webp" type="image/webp" />
-  <link rel="preload" as="image" href="assets/keychains/BRANDING-KC.webp" type="image/webp" />
-  <link rel="preload" as="image" href="assets/keychains/SOCIAL-KC.webp" type="image/webp" />
-  <link rel="preload" as="image" href="assets/keychains/WEB-KC.webp" type="image/webp" />
-  <link rel="preload" as="image" href="assets/keychains/STAR-KC.webp" type="image/webp" />
+  <link rel="preload" as="image" href="assets/page-bg.webp" type="image/webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="assets/keychains/BG.webp" type="image/webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="assets/keychains/BRANDING-KC.webp" type="image/webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="assets/keychains/SOCIAL-KC.webp" type="image/webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="assets/keychains/WEB-KC.webp" type="image/webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="assets/keychains/STAR-KC.webp" type="image/webp" fetchpriority="high" />
   <link rel="stylesheet" href="page.css?v=4" />
   <link rel="stylesheet" href="components/keychains/keychain-cluster.css?v=1" />
 </head>
@@ -22,6 +22,6 @@
 
   <div class="keychain-cluster"></div>
 
-  <script src="components/keychains/keychain-cluster.js?v=2"></script>
+  <script src="components/keychains/keychain-cluster.js?v=3"></script>
 </body>
 </html>
