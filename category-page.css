@@ -183,6 +183,26 @@ body {
   height: auto;
 }
 
+/* Web Design variant: the image itself can be much taller than the box
+   (a full-length page screenshot), so it scrolls inside a fixed-height
+   frame instead of stretching the row — the frame, not .gallery-item,
+   owns the fixed size, so the caption below stays outside the scroll
+   area and unaffected. */
+.gallery-frame {
+  width: 100%;
+  height: 34rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid rgba(26, 26, 26, 0.15);
+}
+
+.gallery-frame img,
+.gallery-frame .gallery-video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .gallery-caption {
   display: inline-flex;
   align-items: center;
