@@ -79,46 +79,69 @@
     if (!host || host.dataset.kcInitialized) return;
     host.dataset.kcInitialized = "true";
 
-    var canvas = document.createElement("div");
-    canvas.className = "keychain-canvas";
-    host.appendChild(canvas);
+    // A page that cares about first-paint speed (home.html) can hand-write
+    // the full markup up front — real <img> tags the browser's own parser/
+    // preload scanner discovers immediately, instead of waiting on this
+    // script to run after DOMContentLoaded to create them. When that
+    // markup is already there this just wires it up; otherwise it falls
+    // back to building everything from scratch, so a bare
+    // `<div class="keychain-cluster"></div>` still works as documented.
+    var canvas = host.querySelector(".keychain-canvas");
+    var prebuilt = !!canvas;
+    if (!prebuilt) {
+      canvas = document.createElement("div");
+      canvas.className = "keychain-canvas";
+      host.appendChild(canvas);
+    }
 
-    var bg = document.createElement("img");
-    bg.className = "kc-bg";
-    bg.fetchPriority = "high";
-    bg.decoding = "sync";
-    bg.src = ASSET_BASE + "BG.webp";
-    bg.alt = "";
-    bg.setAttribute("aria-hidden", "true");
-    bg.draggable = false;
-    canvas.appendChild(bg);
+    var bg = canvas.querySelector(".kc-bg");
+    if (!bg) {
+      bg = document.createElement("img");
+      bg.className = "kc-bg";
+      bg.fetchPriority = "high";
+      bg.decoding = "sync";
+      bg.src = ASSET_BASE + "BG.webp";
+      bg.alt = "";
+      bg.setAttribute("aria-hidden", "true");
+      bg.draggable = false;
+      canvas.appendChild(bg);
+    }
 
     var items = TAGS.map(function (tag) {
-      var button = document.createElement("a");
-      button.href = tag.href;
-      button.className = "kc-item";
-      button.dataset.key = tag.key;
-      button.setAttribute("aria-label", tag.label);
+      var button = prebuilt ? canvas.querySelector('.kc-item[data-key="' + tag.key + '"]') : null;
+      var img, glare;
 
-      var img = document.createElement("img");
-      img.className = "kc-img";
-      img.fetchPriority = "high";
-      img.decoding = "sync";
-      img.src = ASSET_BASE + tag.file;
-      img.alt = "";
-      img.draggable = false;
+      if (button) {
+        img = button.querySelector(".kc-img");
+        glare = button.querySelector(".kc-glare");
+      } else {
+        button = document.createElement("a");
+        button.href = tag.href;
+        button.className = "kc-item";
+        button.dataset.key = tag.key;
+        button.setAttribute("aria-label", tag.label);
 
-      var glare = document.createElement("span");
-      glare.className = "kc-glare";
-      glare.setAttribute("aria-hidden", "true");
+        img = document.createElement("img");
+        img.className = "kc-img";
+        img.fetchPriority = "high";
+        img.decoding = "sync";
+        img.src = ASSET_BASE + tag.file;
+        img.alt = "";
+        img.draggable = false;
+
+        glare = document.createElement("span");
+        glare.className = "kc-glare";
+        glare.setAttribute("aria-hidden", "true");
+
+        button.appendChild(img);
+        button.appendChild(glare);
+        canvas.appendChild(button);
+      }
+
       // absolute URL: relative url()s inside a custom property resolve
       // against the stylesheet that consumes var(), not the one (or the
       // inline style) that set it — so a relative path here would 404.
       glare.style.setProperty("--mask-src", "url(\"" + new URL(ASSET_BASE + tag.file, document.baseURI).href + "\")");
-
-      button.appendChild(img);
-      button.appendChild(glare);
-      canvas.appendChild(button);
 
       var entry = { key: tag.key, href: tag.href, button: button, img: img, glare: glare, alphaMask: null };
 
@@ -146,13 +169,12 @@
     // topmost (last in DOM / highest base z-index) checked first
     var hitOrder = items.slice().reverse();
 
-    var hitLayer = document.createElement("div");
-    hitLayer.className = "kc-hitlayer";
-    hitLayer.style.position = "absolute";
-    hitLayer.style.inset = "0";
-    hitLayer.style.zIndex = "4";
-    hitLayer.style.cursor = "pointer";
-    canvas.appendChild(hitLayer);
+    var hitLayer = canvas.querySelector(".kc-hitlayer");
+    if (!hitLayer) {
+      hitLayer = document.createElement("div");
+      hitLayer.className = "kc-hitlayer";
+      canvas.appendChild(hitLayer);
+    }
 
     items.forEach(function (entry) {
       entry.button.style.pointerEvents = "none";

@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Home</title>
-  <!-- The keychain images are only requested once keychain-cluster.js runs
-       (it builds the <img> tags after DOMContentLoaded), so without a
-       preload hint the browser doesn't start fetching them until well
-       after CSS/JS have loaded — these let the preload scanner kick off
-       every image fetch immediately, in parallel, straight from <head>. -->
+  <!-- Preload hints for the same images the markup below requests, so
+       the browser can start fetching all of them the moment it reads
+       <head>, in parallel with CSS/JS, rather than discovering them one
+       by one as it parses down through <body>. -->
+
   <link rel="preload" as="image" href="assets/page-bg.webp" type="image/webp" fetchpriority="high" />
   <link rel="preload" as="image" href="assets/keychains/BG.webp" type="image/webp" fetchpriority="high" />
   <link rel="preload" as="image" href="assets/keychains/BRANDING-KC.webp" type="image/webp" fetchpriority="high" />
@@ -16,12 +16,43 @@
   <link rel="preload" as="image" href="assets/keychains/WEB-KC.webp" type="image/webp" fetchpriority="high" />
   <link rel="preload" as="image" href="assets/keychains/STAR-KC.webp" type="image/webp" fetchpriority="high" />
   <link rel="stylesheet" href="page.css?v=4" />
-  <link rel="stylesheet" href="components/keychains/keychain-cluster.css?v=1" />
+  <link rel="stylesheet" href="components/keychains/keychain-cluster.css?v=2" />
 </head>
 <body>
 
-  <div class="keychain-cluster"></div>
+  <!-- Hand-written instead of JS-built: the browser's own parser sees
+       these <img> tags immediately, so they can start painting as part
+       of the normal page load instead of waiting for keychain-cluster.js
+       to run after DOMContentLoaded and build them — matters most right
+       here, since this is exactly what a cross-document view transition
+       captures for its "new page" frame. keychain-cluster.js detects
+       this markup and wires up interactivity in place rather than
+       rebuilding it. -->
+  <div class="keychain-cluster">
+    <div class="keychain-canvas">
+      <img class="kc-bg" src="assets/keychains/BG.webp" alt="" aria-hidden="true" draggable="false" fetchpriority="high" decoding="sync" />
 
-  <script src="components/keychains/keychain-cluster.js?v=3"></script>
+      <a href="webdesign.html" class="kc-item" data-key="web" aria-label="Web Design — ver projetos">
+        <img class="kc-img" src="assets/keychains/WEB-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="sync" />
+        <span class="kc-glare" aria-hidden="true"></span>
+      </a>
+      <a href="other.html" class="kc-item" data-key="star" aria-label="Others — ver projetos">
+        <img class="kc-img" src="assets/keychains/STAR-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="sync" />
+        <span class="kc-glare" aria-hidden="true"></span>
+      </a>
+      <a href="branding.html" class="kc-item" data-key="branding" aria-label="Branding — ver projetos">
+        <img class="kc-img" src="assets/keychains/BRANDING-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="sync" />
+        <span class="kc-glare" aria-hidden="true"></span>
+      </a>
+      <a href="social.html" class="kc-item" data-key="social" aria-label="Social Media — ver projetos">
+        <img class="kc-img" src="assets/keychains/SOCIAL-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="sync" />
+        <span class="kc-glare" aria-hidden="true"></span>
+      </a>
+
+      <div class="kc-hitlayer"></div>
+    </div>
+  </div>
+
+  <script src="components/keychains/keychain-cluster.js?v=4"></script>
 </body>
 </html>
