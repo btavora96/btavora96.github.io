@@ -12,17 +12,18 @@
     navigation: auto;
   }
 
-  /* shorter, snappier crossfade than the 250ms UA default, same easing
-     used for the rest of the site's hover/unwrap animations */
+  /* quick fade with a light overshoot at the end (toned down from the
+     keychain tags' own hover-tilt curve, which was too pronounced for
+     a full-page crossfade) */
   ::view-transition-group(root) {
-    animation-duration: 180ms;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    animation-duration: 220ms;
+    animation-timing-function: cubic-bezier(0.34, 1.2, 0.64, 1);
   }
 
   ::view-transition-old(root),
   ::view-transition-new(root) {
-    animation-duration: 180ms;
-    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+    animation-duration: 220ms;
+    animation-timing-function: cubic-bezier(0.34, 1.2, 0.64, 1);
   }
 }
 
