@@ -68,6 +68,40 @@ body {
   overflow-x: hidden;
 }
 
+/* Horizontal-scrolling category banner: a single wide track filled with
+   the category's repeatable icon+text SVG as a tiled background, shifted
+   left by exactly one tile's width per animation cycle so the loop point
+   is seamless — the tile itself supplies the per-page image via inline
+   style. Animating transform (not background-position) keeps this on the
+   compositor instead of repainting every frame. */
+.scroll-banner {
+  width: 100%;
+  height: 4rem;
+  overflow: hidden;
+  background-color: #1a1a1a;
+}
+
+.scroll-banner-track {
+  height: 100%;
+  width: 200vw;
+  background-repeat: repeat-x;
+  background-position: left center;
+  background-size: auto 2.5rem;
+  animation: scroll-banner-x 3.2s linear infinite;
+  will-change: transform;
+}
+
+@keyframes scroll-banner-x {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-40px * (638 / 137))); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-banner-track {
+    animation: none;
+  }
+}
+
 .back-button {
   position: fixed;
   top: 6rem; /* matches .project-grid's margin-top, so it lines up with the top of the first gallery image/tile */
