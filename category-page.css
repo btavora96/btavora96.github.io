@@ -2,6 +2,31 @@
    theme, scrollable grid of project thumbnails, separate from the dark
    keychain-cluster home page which keeps its own page.css. */
 
+/* Cross-document View Transitions: on browsers that support it (Chromium
+   126+), the engine crossfades the old/new page snapshots automatically
+   on same-origin navigations instead of the usual hard cut — no JS
+   needed. Unsupported browsers just ignore the rule and navigate as
+   normal. Gated behind prefers-reduced-motion since the spec doesn't
+   suppress it on its own. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition {
+    navigation: auto;
+  }
+
+  /* shorter, snappier crossfade than the 250ms UA default, same easing
+     used for the rest of the site's hover/unwrap animations */
+  ::view-transition-group(root) {
+    animation-duration: 180ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 180ms;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
 @font-face {
   font-family: "Ouma Devanagari";
   src: url("assets/font1/fonnts.com-Ouma_Devanagari_Regular.otf") format("opentype");
