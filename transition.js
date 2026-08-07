@@ -9,16 +9,40 @@
   "use strict";
 
   var FADE_OUT_MS = 160;
+  var MAX_READY_WAIT_MS = 2000;
 
   function markReady() {
     document.body.classList.add("page-ready");
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", markReady);
-  } else {
-    markReady();
+  function domReady() {
+    if (document.readyState !== "loading") return Promise.resolve();
+    return new Promise(function (resolve) {
+      document.addEventListener("DOMContentLoaded", resolve, { once: true });
+    });
   }
+
+  // Reveal only once body's own CSS background-image (the full-bleed page
+  // photo on home.html; most pages don't set one) has actually decoded —
+  // otherwise DOMContentLoaded fires first, the page fades in over a
+  // plain background-color, and the photo pops in separately a moment
+  // later instead of the page appearing whole.
+  function bodyBackgroundReady() {
+    var bg = getComputedStyle(document.body).backgroundImage;
+    var match = /url\(["']?(.*?)["']?\)/.exec(bg);
+    if (!match || !match[1]) return Promise.resolve();
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = resolve;
+      img.onerror = resolve;
+      img.src = match[1];
+    });
+  }
+
+  Promise.race([
+    Promise.all([domReady(), bodyBackgroundReady()]),
+    new Promise(function (resolve) { window.setTimeout(resolve, MAX_READY_WAIT_MS); })
+  ]).then(markReady);
 
   // bfcache restore (native browser back/forward, as opposed to clicking
   // our own links): the page can come back exactly as it was left,
