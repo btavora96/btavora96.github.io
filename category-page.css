@@ -192,6 +192,49 @@ body {
   height: auto;
 }
 
+/* Scroll-driven focus effect (see wireScrollFocus in category-page.js):
+   the item nearest the viewport's center reads as "in focus" (sharp,
+   slightly larger, full opacity) while others recede — like prints
+   hanging in space, catching the light as they pass center. Targets
+   only the direct-child media unit (not the individual stacked
+   screenshots inside a Web Design .gallery-frame, which would otherwise
+   double up with the wrapper's own scaling), and JS drives everything
+   through these custom properties so the CSS side stays a pure function
+   of state — no transitions here, the JS loop already interpolates
+   toward each target every frame for the smoothing/"weight". Defaults
+   below (scale 1, opacity 1, no blur) are what renders if JS never
+   runs (prefers-reduced-motion, or disabled) — a plain static gallery,
+   not a broken one. */
+.gallery-item > img,
+.gallery-item > .gallery-video,
+.gallery-item > .gallery-frame-wrap {
+  --gf-scale: 1;
+  --gf-y: 0px;
+  --gf-opacity: 1;
+  --gf-brightness: 1;
+  --gf-contrast: 1;
+  --gf-blur: 0px;
+  --gf-shadow-blur: 16px;
+  --gf-shadow-alpha: 0.1;
+
+  transform: translateY(var(--gf-y)) scale(var(--gf-scale));
+  opacity: var(--gf-opacity);
+  filter: brightness(var(--gf-brightness)) contrast(var(--gf-contrast)) blur(var(--gf-blur));
+  box-shadow: 0 18px var(--gf-shadow-blur) rgba(0, 0, 0, var(--gf-shadow-alpha));
+  will-change: transform, opacity, filter;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery-item > img,
+  .gallery-item > .gallery-video,
+  .gallery-item > .gallery-frame-wrap {
+    transform: none;
+    opacity: 1;
+    filter: none;
+    box-shadow: none;
+  }
+}
+
 /* Web Design variant: the image itself can be much taller than the box
    (a full-length page screenshot), so it scrolls inside a fixed-height
    frame instead of stretching the row — the frame, not .gallery-item,
