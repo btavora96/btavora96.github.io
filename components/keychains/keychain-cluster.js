@@ -268,6 +268,8 @@
       var newTab = e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1;
       if (newTab) {
         window.open(entry.href, "_blank", "noopener");
+      } else if (window.navigateWithFade) {
+        window.navigateWithFade(entry.href);
       } else {
         window.location.href = entry.href;
       }

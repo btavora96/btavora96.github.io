@@ -1,31 +1,10 @@
 /* Shared page shell — dark background + basic typography for every page
    in the site (the keychains demo and the 4 category pages). */
 
-/* Cross-document View Transitions: on browsers that support it (Chromium
-   126+), the engine crossfades the old/new page snapshots automatically
-   on same-origin navigations instead of the usual hard cut — no JS
-   needed. Unsupported browsers just ignore the rule and navigate as
-   normal. Gated behind prefers-reduced-motion since the spec doesn't
-   suppress it on its own. */
-@media (prefers-reduced-motion: no-preference) {
-  @view-transition {
-    navigation: auto;
-  }
-
-  /* quick fade with a light overshoot at the end (toned down from the
-     keychain tags' own hover-tilt curve, which was too pronounced for
-     a full-page crossfade) */
-  ::view-transition-group(root) {
-    animation-duration: 220ms;
-    animation-timing-function: cubic-bezier(0.34, 1.2, 0.64, 1);
-  }
-
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
-    animation-duration: 220ms;
-    animation-timing-function: cubic-bezier(0.34, 1.2, 0.64, 1);
-  }
-}
+/* Page-to-page fade: see transition.css/transition.js (shared across all
+   5 pages) — a plain JS-driven opacity crossfade instead of the
+   Chromium-only View Transitions API, so it actually works regardless
+   of which browser this is viewed in. */
 
 * {
   box-sizing: border-box;

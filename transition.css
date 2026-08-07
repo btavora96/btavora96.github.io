@@ -1,0 +1,26 @@
+/* Universal page fade — works in every browser, not just the ones that
+   support the (Chromium-only) View Transitions API. body starts hidden
+   and fades in once transition.js marks it ready; internal links fade
+   it out first, then navigate, so there's never an abrupt hard cut
+   between pages. Requires JS — see the <noscript> fallback in each
+   page's <head>. */
+body {
+  opacity: 0;
+}
+
+body.page-ready {
+  opacity: 1;
+  transition: opacity 200ms ease-out;
+}
+
+body.page-leaving {
+  opacity: 0;
+  transition: opacity 160ms ease-in;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.page-ready,
+  body.page-leaving {
+    transition: none;
+  }
+}
