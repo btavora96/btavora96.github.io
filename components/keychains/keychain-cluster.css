@@ -108,8 +108,12 @@
      top receding to compensate. */
   transform-origin: 50% 30%;
   transform: rotateX(var(--rx)) rotateY(var(--ry)) translateZ(var(--tz));
-  filter: drop-shadow(var(--sx) var(--sy) var(--sb) rgba(0, 0, 0, var(--sa)))
-          drop-shadow(0 0 0px transparent);
+  /* a single drop-shadow — this recomputes every frame while a tag is
+     being tracked, and drop-shadow is one of the more expensive filters
+     to rasterize, so the never-used-by-default second shadow layer
+     (previously here for the "selected" glow) was pure wasted cost on
+     every hover. .is-selected below adds its own second layer instead. */
+  filter: drop-shadow(var(--sx) var(--sy) var(--sb) rgba(0, 0, 0, var(--sa)));
   /* short and overshoot-free: this retargets on every pointermove while
      the cursor tracks across the tag, and a longer/bouncy easing (fine
      for a one-off transition) makes continuous tracking look like it's

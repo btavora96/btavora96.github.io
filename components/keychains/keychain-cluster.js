@@ -303,8 +303,20 @@
       return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) };
     }
 
-    function handlePointerMove(e) {
-      var point = relativePoint(e.clientX, e.clientY);
+    // A physical mouse can fire pointermove far faster than the screen
+    // actually redraws (up to 1000Hz on gaming mice vs. a 60/120Hz
+    // display), and each call sets several CSS custom properties that
+    // feed an animated filter/transform — coalescing to one update per
+    // rendered frame cuts that redundant work instead of doing it more
+    // often than the browser could ever show.
+    var pendingPoint = null;
+    var rafId = null;
+
+    function processPendingPoint() {
+      rafId = null;
+      if (!pendingPoint) return;
+      var point = pendingPoint;
+      pendingPoint = null;
       var hit = hitTest(point.x, point.y);
       if (hit) {
         setActive(hit);
@@ -314,7 +326,19 @@
       }
     }
 
+    function handlePointerMove(e) {
+      pendingPoint = relativePoint(e.clientX, e.clientY);
+      if (rafId === null) {
+        rafId = requestAnimationFrame(processPendingPoint);
+      }
+    }
+
     function handlePointerLeave() {
+      pendingPoint = null;
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       setActive(null);
     }
 
