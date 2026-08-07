@@ -306,17 +306,15 @@
     // A physical mouse can fire pointermove far faster than the screen
     // actually redraws (up to 1000Hz on gaming mice vs. a 60/120Hz
     // display), and each call sets several CSS custom properties that
-    // feed an animated filter/transform — coalescing to one update per
-    // rendered frame cuts that redundant work instead of doing it more
-    // often than the browser could ever show.
+    // feed an animated filter/transform — so extra events arriving
+    // within the same rendered frame get coalesced to one update. The
+    // very first event of a frame is still applied immediately (not
+    // queued for the next rAF tick), so the tilt starts reacting the
+    // instant the pointer arrives instead of a frame later.
     var pendingPoint = null;
     var rafId = null;
 
-    function processPendingPoint() {
-      rafId = null;
-      if (!pendingPoint) return;
-      var point = pendingPoint;
-      pendingPoint = null;
+    function applyPoint(point) {
       var hit = hitTest(point.x, point.y);
       if (hit) {
         setActive(hit);
@@ -326,10 +324,21 @@
       }
     }
 
+    function flushPendingPoint() {
+      rafId = null;
+      if (!pendingPoint) return;
+      var point = pendingPoint;
+      pendingPoint = null;
+      applyPoint(point);
+    }
+
     function handlePointerMove(e) {
-      pendingPoint = relativePoint(e.clientX, e.clientY);
+      var point = relativePoint(e.clientX, e.clientY);
       if (rafId === null) {
-        rafId = requestAnimationFrame(processPendingPoint);
+        applyPoint(point);
+        rafId = requestAnimationFrame(flushPendingPoint);
+      } else {
+        pendingPoint = point;
       }
     }
 
