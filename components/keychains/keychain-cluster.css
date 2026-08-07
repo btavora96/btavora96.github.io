@@ -21,6 +21,24 @@
   transform: translateY(-20%);
   perspective: 1400px;
   pointer-events: auto;
+
+  /* hidden until every tag/BG image has actually decoded (see
+     keychain-cluster.js), then fades in as one piece — async image
+     decoding means each one becomes paintable at a slightly different
+     moment, so without this they'd otherwise pop in one by one instead
+     of appearing together. */
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.keychain-canvas.kc-ready {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .keychain-canvas {
+    transition: none;
+  }
 }
 
 /* static base — carabiner, ring & keys. Never animates. */

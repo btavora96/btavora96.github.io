@@ -157,6 +157,23 @@
       return entry;
     });
 
+    // Reveal BG + all 4 tags together, once every one of them has actually
+    // decoded — async decoding (deliberate, so it never blocks first
+    // paint) means each image becomes paintable at its own moment, which
+    // without this looked like the tags popping in one by one instead of
+    // the cluster appearing as a single piece.
+    var allImgs = [bg].concat(items.map(function (entry) { return entry.img; }));
+    Promise.all(allImgs.map(function (img) {
+      if (img.decode) return img.decode().catch(function () {});
+      if (img.complete) return Promise.resolve();
+      return new Promise(function (resolve) {
+        img.addEventListener("load", resolve, { once: true });
+        img.addEventListener("error", resolve, { once: true });
+      });
+    })).then(function () {
+      canvas.classList.add("kc-ready");
+    });
+
     // optional "you are here": set data-current-key="branding" (etc) on the
     // host when this component is embedded on one of the category pages,
     // and that tag keeps the persistent selection glow permanently.
