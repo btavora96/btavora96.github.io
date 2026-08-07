@@ -110,8 +110,12 @@
   transform: rotateX(var(--rx)) rotateY(var(--ry)) translateZ(var(--tz));
   filter: drop-shadow(var(--sx) var(--sy) var(--sb) rgba(0, 0, 0, var(--sa)))
           drop-shadow(0 0 0px transparent);
-  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
-              filter 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* short and overshoot-free: this retargets on every pointermove while
+     the cursor tracks across the tag, and a longer/bouncy easing (fine
+     for a one-off transition) makes continuous tracking look like it's
+     lagging a beat behind the actual pointer instead of following it. */
+  transition: transform 0.12s ease-out,
+              filter 0.12s ease-out;
   will-change: transform, filter;
 }
 
@@ -131,7 +135,7 @@
   mix-blend-mode: screen;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: opacity 0.12s ease-out;
 
   -webkit-mask-image: var(--mask-src);
   mask-image: var(--mask-src);
