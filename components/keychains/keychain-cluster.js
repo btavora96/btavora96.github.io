@@ -62,6 +62,77 @@
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
 
+  /**
+   * Ambient motion for the whole cluster (as opposed to a single tag's
+   * own hover tilt, handled separately below): a gentle idle float so it
+   * never reads as perfectly inert, a heavily-damped cursor-follow
+   * parallax so it feels like it has weight, and — only once the phone
+   * layout puts it in normal document flow (see keychain-cluster.css) —
+   * a scroll parallax as it scrolls past, so the first scroll into the
+   * intro text feels like a deliberate transition rather than the hero
+   * just vanishing. One continuous rAF loop recomputes and lerps toward
+   * fresh targets every frame; skipped entirely under reduced motion.
+   */
+  function wireHeroMotion(cluster) {
+    if (prefersReducedMotion()) return;
+
+    var coarse = isCoarsePointer();
+    var mobileLayout = window.matchMedia && window.matchMedia("(max-width: 600px)");
+
+    var targetX = 0;
+    var targetY = 0;
+    var curX = 0;
+    var curY = 0;
+
+    if (!coarse) {
+      window.addEventListener("pointermove", function (e) {
+        if (e.pointerType && e.pointerType !== "mouse") return;
+        targetX = (e.clientX / window.innerWidth) * 2 - 1;
+        targetY = (e.clientY / window.innerHeight) * 2 - 1;
+      }, { passive: true });
+    }
+
+    var start = performance.now();
+
+    function tick(now) {
+      var t = (now - start) / 1000;
+
+      // idle float — slow, independent of the pointer; two different
+      // periods (6s / 9s) for x/y so the drift doesn't look mechanically
+      // synced or repeat in an obvious loop
+      var floatY = Math.sin((t * Math.PI * 2) / 6) * 5;
+      var floatRy = Math.sin((t * Math.PI * 2) / 9) * 0.5;
+
+      // cursor-follow — heavily damped so it trails the pointer rather
+      // than tracking it directly, reading as inertia/weight
+      curX += (targetX - curX) * 0.035;
+      curY += (targetY - curY) * 0.035;
+
+      // scroll parallax — only meaningful once the cluster is actually
+      // in flow (the phone layout); position:fixed on desktop never
+      // scrolls, so this stays at rest (0 / full opacity) there
+      var scrollY = 0;
+      var scrollOpacity = 1;
+      if (mobileLayout && mobileLayout.matches) {
+        var rect = cluster.getBoundingClientRect();
+        var progress = Math.max(0, Math.min(1, -rect.top / Math.max(rect.height, 1)));
+        scrollY = progress * -40;
+        scrollOpacity = 1 - progress * 0.6;
+      }
+
+      var style = cluster.style;
+      style.setProperty("--kc-x", (curX * 8).toFixed(2) + "px");
+      style.setProperty("--kc-y", (curY * 6 + floatY + scrollY).toFixed(2) + "px");
+      style.setProperty("--kc-rx", (-curY * 1.6).toFixed(3) + "deg");
+      style.setProperty("--kc-ry", (curX * 2.2 + floatRy).toFixed(3) + "deg");
+      style.opacity = scrollOpacity.toFixed(3);
+
+      requestAnimationFrame(tick);
+    }
+
+    requestAnimationFrame(tick);
+  }
+
   function buildAlphaMask(img) {
     try {
       var canvas = document.createElement("canvas");
@@ -173,6 +244,8 @@
     })).then(function () {
       canvas.classList.add("kc-ready");
     });
+
+    wireHeroMotion(host);
 
     // optional "you are here": set data-current-key="branding" (etc) on the
     // host when this component is embedded on one of the category pages,

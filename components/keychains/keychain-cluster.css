@@ -12,30 +12,62 @@
   width: clamp(358px, 50.61vw, 974px);
   z-index: 50;
   pointer-events: none;
+
+  /* Ambient motion — idle float, cursor-follow parallax, and (only on
+     the phone layout, where the cluster sits in normal flow) a scroll
+     parallax as it scrolls past. All driven by wireHeroMotion in
+     keychain-cluster.js, one rAF loop that lerps toward fresh targets
+     every frame — that lerp is what gives it inertia/weight instead of
+     snapping straight to the cursor. No CSS transition on this
+     transform: a transition fighting a value that already changes every
+     16ms would just add lag on top of the intentional one. Defaults
+     below (all neutral) are what renders if the JS never runs
+     (prefers-reduced-motion) — the cluster just sits still. */
+  --kc-x: 0px;
+  --kc-y: 0px;
+  --kc-rx: 0deg;
+  --kc-ry: 0deg;
+  transform: perspective(1600px) translate3d(var(--kc-x), var(--kc-y), 0)
+             rotateX(var(--kc-rx)) rotateY(var(--kc-ry));
 }
 
 .keychain-canvas {
   position: relative;
   width: 100%;
   aspect-ratio: 2 / 3;
-  transform: translateY(-20%);
   perspective: 1400px;
   pointer-events: auto;
 
+  /* Resting crop offset (per breakpoint, see media queries below) plus
+     a one-time entrance offset that eases out to 0 once kc-ready is
+     set — the canvas arrives with a soft settle (slight rise + scale
+     up) instead of a flat opacity fade. */
+  --kc-rest-y: -20%;
+  --kc-enter-y: 14px;
+  --kc-enter-scale: 0.965;
+  transform: translateY(var(--kc-rest-y)) translateY(var(--kc-enter-y)) scale(var(--kc-enter-scale));
+
   /* hidden until every tag/BG image has actually decoded (see
-     keychain-cluster.js), then fades in as one piece — async image
+     keychain-cluster.js), then eases in as one piece — async image
      decoding means each one becomes paintable at a slightly different
      moment, so without this they'd otherwise pop in one by one instead
      of appearing together. */
   opacity: 0;
-  transition: opacity 0.25s ease;
+  transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 1s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .keychain-canvas.kc-ready {
+  --kc-enter-y: 0px;
+  --kc-enter-scale: 1;
   opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .keychain-cluster {
+    transform: none;
+  }
+
   .keychain-canvas {
     transition: none;
   }
@@ -177,10 +209,25 @@
   }
 }
 
-/* Phone */
+/* Phone — a large centered hero instead of a small fixed corner tile:
+   flows in-page above the intro/contact text (see page.css) rather
+   than staying pinned while the page scrolls underneath it. */
 @media (max-width: 600px) {
   .keychain-cluster {
-    width: clamp(117px, 35.85vw, 171px);
-    right: clamp(0.5rem, 12vw, 3.45rem);
+    position: static;
+    top: auto;
+    right: auto;
+    width: min(88vw, 420px);
+    /* 75% of the canvas's own 2:3 ratio, so the top 25% (clipped below
+       via overflow) reads as the same top-crop the desktop version
+       gets from being pinned with its canvas shifted up — here
+       recreated with a shorter box instead of position:fixed. */
+    aspect-ratio: 2 / 2.25;
+    overflow: hidden;
+    margin: 0 auto;
+  }
+
+  .keychain-canvas {
+    --kc-rest-y: -25%;
   }
 }

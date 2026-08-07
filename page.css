@@ -109,6 +109,7 @@ body {
   font-weight: 700;
   font-size: 1.1rem;
   letter-spacing: 0.02em;
+  text-transform: uppercase;
   margin: 0 0 1rem;
 }
 
@@ -143,9 +144,34 @@ body {
   padding: 0.55rem 1.1rem;
   border: 1.3px solid #f2f2f7;
   border-radius: 999px;
+  background-color: rgba(242, 242, 247, 0);
   text-decoration: none;
   cursor: pointer;
-  transition: font-weight 0.25s ease;
+  transform: scale(1);
+  transition: font-weight 0.25s ease,
+              transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.contact-button:hover,
+.contact-button:focus-visible {
+  transform: scale(1.035);
+  background-color: rgba(242, 242, 247, 0.08);
+}
+
+.contact-button:active {
+  transform: scale(0.965);
+  transition-duration: 0.15s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .contact-button,
+  .contact-button:hover,
+  .contact-button:focus-visible,
+  .contact-button:active {
+    transform: none;
+    transition: font-weight 0.25s ease, background-color 0.25s ease;
+  }
 }
 
 .contact-label {
@@ -170,21 +196,56 @@ body {
   text-align: right;
 }
 
+/* Mobile home layout — a phone doesn't have the spare room for the
+   desktop's fixed-corner composition, so below 600px everything drops
+   into normal document flow and stacks in a single centered column
+   (hero, then intro, then contact), in that order because that's
+   already the order they appear in the markup. Desktop rules above are
+   untouched; this only overrides what's needed for the narrow layout. */
 @media (max-width: 600px) {
   .info-box {
-    padding: 1rem 1.25rem;
+    position: static;
+    z-index: auto;
+    width: 100%;
+    max-width: 26rem;
+    margin: 0 auto;
+    padding: 0 1.75rem;
+  }
+
+  .info-heading {
+    font-size: clamp(1.6rem, 7vw, 2.1rem);
+    text-align: center;
+    margin: 0 0 1.5rem;
   }
 
   .hello-box {
-    top: auto;
-    bottom: 9rem;
-    left: 25px;
+    margin-top: 1.25rem;
+  }
+
+  .hello-box p {
+    text-align: center;
+    font-size: 1rem;
+    line-height: 1.75;
+    margin: 0 0 1.35rem;
   }
 
   .contact-box {
-    right: 25px;
-    bottom: 2rem;
-    align-items: flex-end;
-    text-align: right;
+    align-items: center;
+    text-align: center;
+    margin: 4rem auto 4.5rem;
+    gap: 1.1rem;
+  }
+
+  .contact-button {
+    padding: 0.85rem 1.85rem;
+  }
+
+  .contact-label {
+    font-size: 0.95rem;
+  }
+
+  .contact-subtitle {
+    text-align: center;
+    font-size: 0.95rem;
   }
 }
