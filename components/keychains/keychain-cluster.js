@@ -62,19 +62,46 @@
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   }
 
+  // Per-tag spring "personality" — mass/stiffness/damping give each
+  // keychain its own natural frequency and settle time (heavier =
+  // slower + less swingy, lighter = faster + livelier); sensitivity is
+  // how much of the shared cursor-follow "backpack sway" each one
+  // picks up; idle* seeds a small continuous drift so nothing ever
+  // looks perfectly frozen; kick is the entrance swing's initial
+  // velocity (deg/s) and its sign, so the four don't swing out in
+  // unison. Damping sits a little under critical for each one (see the
+  // integration in wireHeroMotion) — enough for one small, natural
+  // overshoot while settling, not a repeating bounce.
+  var SPRINGS = {
+    web: { mass: 1.05, stiffness: 30, damping: 7.4, sensitivity: 2.1, idleAmp: 0.4, idlePeriod: 5.4, idlePhase: 0.6, kick: 6, entryDelayMs: 50 },
+    star: { mass: 0.9, stiffness: 34, damping: 6.6, sensitivity: 2.5, idleAmp: 0.45, idlePeriod: 4.7, idlePhase: 2.1, kick: -7, entryDelayMs: 160 },
+    branding: { mass: 1.4, stiffness: 21, damping: 7.8, sensitivity: 1.5, idleAmp: 0.3, idlePeriod: 6.6, idlePhase: 3.4, kick: 4.5, entryDelayMs: 270 },
+    social: { mass: 0.72, stiffness: 42, damping: 6, sensitivity: 2.9, idleAmp: 0.5, idlePeriod: 3.9, idlePhase: 1.2, kick: -8.5, entryDelayMs: 380 }
+  };
+
   /**
-   * Ambient motion for the whole cluster (as opposed to a single tag's
-   * own hover tilt, handled separately below): a gentle idle float so it
-   * never reads as perfectly inert, a heavily-damped cursor-follow
-   * parallax so it feels like it has weight, and — only once the phone
-   * layout puts it in normal document flow (see keychain-cluster.css) —
-   * a scroll parallax as it scrolls past, so the first scroll into the
-   * intro text feels like a deliberate transition rather than the hero
-   * just vanishing. One continuous rAF loop recomputes and lerps toward
-   * fresh targets every frame; skipped entirely under reduced motion.
+   * Ambient motion for the whole cluster and hinge physics for each
+   * individual tag.
+   *
+   * The cluster itself gets a gentle idle float (never reads as
+   * perfectly inert) and a heavily-damped cursor-follow parallax — like
+   * gently swinging the backpack the keys hang off. Each tag is then a
+   * damped spring hanging off THAT signal, rotating around its own ring
+   * (see the per-tag transform-origin in keychain-cluster.css) rather
+   * than in lockstep — a real pendulum, not four copies of one
+   * animation. On the phone layout (in normal flow, unlike desktop's
+   * fixed position) the cluster also gets a scroll parallax as it
+   * scrolls past.
+   *
+   * One continuous rAF loop drives all of it, recomputing and
+   * integrating every frame — that per-frame physics is what gives the
+   * motion weight/inertia instead of a mechanical snap to target.
+   * Skipped entirely under reduced motion.
    */
-  function wireHeroMotion(cluster) {
-    if (prefersReducedMotion()) return;
+  function wireHeroMotion(cluster, items) {
+    if (prefersReducedMotion()) {
+      return { kick: function () {} };
+    }
 
     var coarse = isCoarsePointer();
     var mobileLayout = window.matchMedia && window.matchMedia("(max-width: 600px)");
@@ -92,19 +119,49 @@
       }, { passive: true });
     }
 
+    var tags = items.map(function (entry) {
+      var cfg = SPRINGS[entry.key] || SPRINGS.web;
+      return {
+        key: entry.key,
+        el: entry.button,
+        mass: cfg.mass,
+        stiffness: cfg.stiffness,
+        damping: cfg.damping,
+        sensitivity: cfg.sensitivity,
+        idleAmp: cfg.idleAmp,
+        idlePeriod: cfg.idlePeriod,
+        idlePhase: cfg.idlePhase,
+        kick: cfg.kick,
+        entryDelayMs: cfg.entryDelayMs,
+        angle: 0,
+        velocity: 0
+      };
+    });
+
     var start = performance.now();
+    var last = start;
 
     function tick(now) {
       var t = (now - start) / 1000;
+      // clamp so a dropped frame (tab backgrounded, etc.) can't jolt
+      // the spring integration with a huge one-off dt
+      var dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
 
       // idle float — slow, independent of the pointer; two different
       // periods (6s / 9s) for x/y so the drift doesn't look mechanically
-      // synced or repeat in an obvious loop
-      var floatY = Math.sin((t * Math.PI * 2) / 6) * 5;
-      var floatRy = Math.sin((t * Math.PI * 2) / 9) * 0.5;
+      // synced or repeat in an obvious loop. On the phone layout the
+      // cluster sits in normal flow right above the intro text (not off
+      // in a fixed corner), so the same amplitude reads as more
+      // noticeable there — toned down a bit for mobile only.
+      var mobileMotion = mobileLayout && mobileLayout.matches;
+      var idleScale = mobileMotion ? 0.6 : 1;
+      var floatY = Math.sin((t * Math.PI * 2) / 6) * 5 * idleScale;
+      var floatRy = Math.sin((t * Math.PI * 2) / 9) * 0.5 * idleScale;
 
       // cursor-follow — heavily damped so it trails the pointer rather
-      // than tracking it directly, reading as inertia/weight
+      // than tracking it directly, reading as inertia/weight (this is
+      // the "backpack" the individual keychains below react to)
       curX += (targetX - curX) * 0.035;
       curY += (targetY - curY) * 0.035;
 
@@ -113,10 +170,10 @@
       // scrolls, so this stays at rest (0 / full opacity) there
       var scrollY = 0;
       var scrollOpacity = 1;
-      if (mobileLayout && mobileLayout.matches) {
+      if (mobileMotion) {
         var rect = cluster.getBoundingClientRect();
         var progress = Math.max(0, Math.min(1, -rect.top / Math.max(rect.height, 1)));
-        scrollY = progress * -40;
+        scrollY = progress * -40 * idleScale;
         scrollOpacity = 1 - progress * 0.6;
       }
 
@@ -127,10 +184,41 @@
       style.setProperty("--kc-ry", (curX * 2.2 + floatRy).toFixed(3) + "deg");
       style.opacity = scrollOpacity.toFixed(3);
 
+      // each keychain: a damped spring (semi-implicit Euler) chasing a
+      // target that's the shared backpack sway plus its own tiny idle
+      // drift — never a flat 0, so nothing ever looks perfectly frozen
+      for (var i = 0; i < tags.length; i++) {
+        var tag = tags[i];
+        var idle = Math.sin((t * Math.PI * 2) / tag.idlePeriod + tag.idlePhase) * tag.idleAmp;
+        var target = curX * tag.sensitivity + idle;
+        var force = -tag.stiffness * (tag.angle - target) - tag.damping * tag.velocity;
+        var accel = force / tag.mass;
+        tag.velocity += accel * dt;
+        tag.angle += tag.velocity * dt;
+        tag.el.style.setProperty("--kc-sway", tag.angle.toFixed(3) + "deg");
+      }
+
       requestAnimationFrame(tick);
     }
 
     requestAnimationFrame(tick);
+
+    return {
+      // Entrance swing: a small initial velocity per tag (opposing
+      // signs and staggered to roughly match each one's own opacity
+      // entrance delay in CSS, so the swing is visible as it appears
+      // rather than half-finished by the time it fades in) — the same
+      // spring integration above then carries it into a natural,
+      // one-and-done swing that settles on its own.
+      kick: function () {
+        tags.forEach(function (tag) {
+          window.setTimeout(function () {
+            tag.angle = 0;
+            tag.velocity = tag.kick;
+          }, tag.entryDelayMs);
+        });
+      }
+    };
   }
 
   function buildAlphaMask(img) {
@@ -228,11 +316,21 @@
       return entry;
     });
 
-    // Reveal BG + all 4 tags together, once every one of them has actually
-    // decoded — async decoding (deliberate, so it never blocks first
-    // paint) means each image becomes paintable at its own moment, which
-    // without this looked like the tags popping in one by one instead of
-    // the cluster appearing as a single piece.
+    var heroMotion = wireHeroMotion(host, items);
+
+    // Reveal sequence, once every image has actually decoded — async
+    // decoding (deliberate, so it never blocks first paint) means each
+    // one becomes paintable at its own moment, which without a shared
+    // "everything is ready" gate looked like a random pop-in race.
+    // kc-ready fades the carabiner in first, then each tag "attached"
+    // shortly after with its own stagger (see keychain-cluster.css);
+    // kick() sets off each tag's entrance swing on that same stagger,
+    // and only once the slowest of them has had time to settle does the
+    // intro text get cleared to fade in (see body.kc-settled in
+    // page.css) — the text waits for the object it's introducing to
+    // feel stable instead of appearing at the same instant as everything
+    // else.
+    var SETTLE_MS = prefersReducedMotion() ? 0 : 1800;
     var allImgs = [bg].concat(items.map(function (entry) { return entry.img; }));
     Promise.all(allImgs.map(function (img) {
       if (img.decode) return img.decode().catch(function () {});
@@ -243,9 +341,11 @@
       });
     })).then(function () {
       canvas.classList.add("kc-ready");
+      heroMotion.kick();
+      window.setTimeout(function () {
+        document.body.classList.add("kc-settled");
+      }, SETTLE_MS);
     });
-
-    wireHeroMotion(host);
 
     // optional "you are here": set data-current-key="branding" (etc) on the
     // host when this component is embedded on one of the category pages,

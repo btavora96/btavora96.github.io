@@ -66,6 +66,23 @@ html, body {
   min-height: 100vh;
 }
 
+/* Each gallery item is its own section: scrolling locks onto whichever one
+   is nearest rather than drifting to rest between two, and a fast flick
+   still stops at the very next item instead of skipping past it (stop:
+   always). Lives on html since that's the actual scrolling box here (body
+   has no overflow of its own) — center align matches wireScrollFocus's own
+   idea of "in focus" (item centered in the viewport), so the resting state
+   after a snap is always the fully-focused one. */
+html {
+  scroll-snap-type: y mandatory;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-snap-type: none;
+  }
+}
+
 body {
   background: #ececee;
   color: #1a1a1a;
@@ -179,6 +196,8 @@ body {
   width: 100%;
   margin-bottom: 4rem;
   text-align: center;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
 }
 
 .gallery-item:last-child {

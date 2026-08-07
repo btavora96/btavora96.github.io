@@ -136,7 +136,12 @@
       return t * t * (3 - 2 * t);
     }
 
-    var EASE = 0.12; // how quickly the applied values chase their target each frame
+    var EASE = 0.19; // how quickly the applied values chase their target each frame
+    // Shrinks the falloff zone so an item reaches full focus well before it
+    // reaches dead-center — with scroll-snap now locking each section to
+    // center, the goal is for the project to already read as sharp/focused
+    // by the time it's settling into place, not just once it's dead still.
+    var FOCUS_SPAN_FACTOR = 0.6;
 
     function tick() {
       var vh = window.innerHeight;
@@ -145,7 +150,7 @@
       entries.forEach(function (entry) {
         var rect = entry.item.getBoundingClientRect();
         var itemCenter = rect.top + rect.height / 2;
-        var span = vh / 2 + rect.height / 2;
+        var span = (vh / 2 + rect.height / 2) * FOCUS_SPAN_FACTOR;
         var dist = span > 0 ? clamp((itemCenter - vCenter) / span, -1, 1) : 0;
         var focus = smoothstep(clamp(1 - Math.abs(dist), 0, 1));
 

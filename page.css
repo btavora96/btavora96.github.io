@@ -34,18 +34,28 @@ html, body {
 }
 
 body {
-  /* solid fallback matches the photo's darkest tone, so on aspect ratios
-     narrower than the source photo (which "cover" would otherwise zoom/
-     crop hard to fill) any sliver left uncovered reads as more background
-     instead of a crop. Only safe down to roughly a 1.2 aspect ratio —
-     narrower than that (phones in portrait) needs plain cover instead,
-     see the media query below. */
-  background-color: #06060f;
-  background-image: url("assets/page-bg.webp");
-  background-size: 130% auto;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  /* Four layers, front to back: a faint film-grain tile (blended via
+     "overlay" so it reads as texture, not a visible pattern), a soft
+     vignette that darkens the edges, a warm, low, soft glow sitting
+     roughly behind the keychain hero (like one large studio light
+     source), and the photo itself. Solid fallback color is a warm
+     charcoal rather than a nearly-black navy — richer and less cold,
+     and on aspect ratios narrower than the photo (which "cover" would
+     otherwise zoom/crop hard to fill) any sliver left uncovered reads
+     as more background instead of a crop. Only safe down to roughly a
+     1.2 aspect ratio — narrower than that (phones in portrait) needs
+     plain cover instead, see the media query below. */
+  background-color: #17140f;
+  background-image:
+    url("assets/grain.svg"),
+    radial-gradient(ellipse 85% 75% at 50% 45%, transparent 55%, rgba(8, 7, 6, 0.5) 100%),
+    radial-gradient(circle at 76% 20%, rgba(255, 232, 205, 0.08), transparent 55%),
+    url("assets/page-bg.webp");
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+  background-size: 200px 200px, 100% 100%, 100% 100%, 130% auto;
+  background-position: 0 0, center, center, center;
+  background-blend-mode: overlay, normal, normal, normal;
+  background-attachment: fixed, fixed, fixed, fixed;
   overflow-x: hidden;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: #f2f2f7;
@@ -53,8 +63,8 @@ body {
 
 @media (max-width: 600px) {
   body {
-    background-size: cover;
-    background-attachment: scroll;
+    background-size: 200px 200px, 100% 100%, 100% 100%, cover;
+    background-attachment: scroll, scroll, scroll, scroll;
   }
 }
 
@@ -97,20 +107,45 @@ body {
 }
 
 /* Home page intro/contact call-outs — plain text blocks (no border/fill)
-   sitting on top of the background photo. */
+   sitting on top of the background photo. Held back (opacity/translateY)
+   until body carries .kc-settled — added by keychain-cluster.js once the
+   hero's entrance swing has settled — so the text only breathes in once
+   the object it's introducing feels stable, instead of appearing at the
+   same time as everything else. */
 .info-box {
   position: fixed;
   z-index: 40;
   max-width: min(26rem, calc(100vw - 4rem));
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+body.kc-settled .info-box {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+body.kc-settled .contact-box {
+  transition-delay: 0.12s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .info-box {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 .info-heading {
   font-family: "Ouma Devanagari", sans-serif;
   font-weight: 700;
   font-size: 1.1rem;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  margin: 0 0 1rem;
+  margin: 0 0 1.15rem;
 }
 
 .hello-box {
@@ -119,9 +154,9 @@ body {
 }
 
 .hello-box p {
-  margin: 0 0 1rem;
+  margin: 0 0 1.1rem;
   font-size: 0.95rem;
-  line-height: 1.55;
+  line-height: 1.65;
   color: rgba(242, 242, 247, 0.85);
 }
 

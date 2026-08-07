@@ -38,38 +38,18 @@
   perspective: 1400px;
   pointer-events: auto;
 
-  /* Resting crop offset (per breakpoint, see media queries below) plus
-     a one-time entrance offset that eases out to 0 once kc-ready is
-     set — the canvas arrives with a soft settle (slight rise + scale
-     up) instead of a flat opacity fade. */
+  /* Resting crop offset only (per breakpoint, see media queries below)
+     — purely layout, never animated. The entrance sequence lives on
+     the children now (.kc-bg, .kc-item), staggered, so "carabiner
+     fades in, then keychains appear attached" is an actual sequence
+     rather than the whole canvas fading in as one flat block. */
   --kc-rest-y: -20%;
-  --kc-enter-y: 14px;
-  --kc-enter-scale: 0.965;
-  transform: translateY(var(--kc-rest-y)) translateY(var(--kc-enter-y)) scale(var(--kc-enter-scale));
-
-  /* hidden until every tag/BG image has actually decoded (see
-     keychain-cluster.js), then eases in as one piece — async image
-     decoding means each one becomes paintable at a slightly different
-     moment, so without this they'd otherwise pop in one by one instead
-     of appearing together. */
-  opacity: 0;
-  transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1),
-              transform 1s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.keychain-canvas.kc-ready {
-  --kc-enter-y: 0px;
-  --kc-enter-scale: 1;
-  opacity: 1;
+  transform: translateY(var(--kc-rest-y));
 }
 
 @media (prefers-reduced-motion: reduce) {
   .keychain-cluster {
     transform: none;
-  }
-
-  .keychain-canvas {
-    transition: none;
   }
 }
 
@@ -84,6 +64,15 @@
   user-select: none;
   -webkit-user-drag: none;
   z-index: 1;
+
+  /* entrance, stage 1: the carabiner — heavy, fixed, arrives first and
+     plainly (a fade only, no motion, since it "barely moves"). */
+  opacity: 0;
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.keychain-canvas.kc-ready .kc-bg {
+  opacity: 1;
 }
 
 .kc-item {
@@ -99,6 +88,58 @@
   z-index: 2;
   -webkit-tap-highlight-color: transparent;
   touch-action: manipulation;
+
+  /* entrance, stage 2: each tag fades in "attached" (opacity only — it
+     doesn't slide in from anywhere, it's already hanging in place),
+     staggered slightly per tag below. Once visible, keychain-cluster.js
+     kicks --kc-sway's spring to swing it out and settle, driven by
+     wireHeroMotion — no CSS transition on that rotation: it's already
+     eased by the JS spring integration every frame, and a transition on
+     top would just add lag to an intentionally physical motion. */
+  --kc-sway: 0deg;
+  opacity: 0;
+  transform: rotate(var(--kc-sway));
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.keychain-canvas.kc-ready .kc-item {
+  opacity: 1;
+}
+
+/* Each tag hangs from where its own ring actually attaches (measured
+   from the artwork's own bounding box), not a shared/generic point —
+   and staggered slightly on entrance so the four don't appear in
+   perfect unison. */
+.kc-item[data-key="web"],
+.kc-item[data-key="web"] .kc-img {
+  transform-origin: 68.6% 40.1%;
+}
+.kc-item[data-key="web"] {
+  transition-delay: 0.05s;
+}
+
+.kc-item[data-key="star"],
+.kc-item[data-key="star"] .kc-img {
+  transform-origin: 20.5% 41.4%;
+}
+.kc-item[data-key="star"] {
+  transition-delay: 0.16s;
+}
+
+.kc-item[data-key="branding"],
+.kc-item[data-key="branding"] .kc-img {
+  transform-origin: 28.4% 34.1%;
+}
+.kc-item[data-key="branding"] {
+  transition-delay: 0.27s;
+}
+
+.kc-item[data-key="social"],
+.kc-item[data-key="social"] .kc-img {
+  transform-origin: 55.5% 31.3%;
+}
+.kc-item[data-key="social"] {
+  transition-delay: 0.38s;
 }
 
 .kc-item:focus-visible {
@@ -135,10 +176,11 @@
   --sb: 20px;
   --sa: 0.28;
 
-  /* pivot near the hanging point (top), not the center: the top stays put
-     and only the bottom swings outward/forward on hover, instead of the
-     top receding to compensate. */
-  transform-origin: 50% 30%;
+  /* pivot at the same per-tag ring point as the parent .kc-item's own
+     sway (see the [data-key] rules above) — the top stays put and only
+     the bottom swings/tilts outward, instead of the top receding to
+     compensate, and the hover-tilt now pivots from the same physical
+     hinge as the ambient swing rather than a different point. */
   transform: rotateX(var(--rx)) rotateY(var(--ry)) translateZ(var(--tz));
   /* a single drop-shadow — this recomputes every frame while a tag is
      being tracked, and drop-shadow is one of the more expensive filters
@@ -199,6 +241,12 @@
   .kc-glare {
     transition-duration: 0.05s;
   }
+
+  .kc-bg,
+  .kc-item {
+    transition-duration: 0.05s;
+    transition-delay: 0s;
+  }
 }
 
 /* Tablet */
@@ -218,16 +266,21 @@
     top: auto;
     right: auto;
     width: min(88vw, 420px);
-    /* 75% of the canvas's own 2:3 ratio, so the top 25% (clipped below
-       via overflow) reads as the same top-crop the desktop version
-       gets from being pinned with its canvas shifted up — here
-       recreated with a shorter box instead of position:fixed. */
-    aspect-ratio: 2 / 2.25;
+    /* Sized from the real alpha bounds of every layer (BG + all 4 tags),
+       not just the carabiner — BRANDING-KC's own artwork reaches down to
+       ~89% of the canvas (well past BG's own ~67%), so a box sized only
+       around the carabiner was clipping the bottom of that tag. This
+       covers the full measured range (~7%–89%) plus a couple of points
+       of margin on each side, so nothing is ever hard-cropped — only a
+       sliver of genuinely empty canvas above/below the artwork is
+       trimmed, same idea as the desktop version's canvas shifting
+       partly above the viewport. */
+    aspect-ratio: 2 / 2.61;
     overflow: hidden;
     margin: 0 auto;
   }
 
   .keychain-canvas {
-    --kc-rest-y: -25%;
+    --kc-rest-y: -5%;
   }
 }
