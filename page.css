@@ -114,7 +114,7 @@ body {
 
 .hello-box {
   top: 16vh;
-  left: 4vw;
+  left: 25px;
 }
 
 .hello-box p {
@@ -129,7 +129,7 @@ body {
 }
 
 .contact-box {
-  right: 4vw;
+  right: 25px;
   bottom: 13vh;
   display: flex;
   flex-direction: column;
@@ -178,11 +178,11 @@ body {
   .hello-box {
     top: auto;
     bottom: 9rem;
-    left: 1.25rem;
+    left: 25px;
   }
 
   .contact-box {
-    right: 1.25rem;
+    right: 25px;
     bottom: 2rem;
     align-items: flex-end;
     text-align: right;
