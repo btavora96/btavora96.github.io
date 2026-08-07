@@ -77,6 +77,15 @@ html {
   scroll-snap-type: y mandatory;
 }
 
+/* While a project's info panel is open (see wireToggle in
+   category-page.js), snapping is switched off entirely — otherwise the
+   moment the user scrolls the text into a comfortable spot, mandatory
+   snap would just pull the page straight back to the image's own snap
+   point, fighting the exact thing they're trying to do. */
+html.gallery-reading-mode {
+  scroll-snap-type: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-snap-type: none;
@@ -132,7 +141,10 @@ body {
 
 .back-button {
   position: fixed;
-  top: 6rem; /* matches .project-grid's margin-top, so it lines up with the top of the first gallery image/tile */
+  top: 6rem; /* stays put near the actual top of the page; .project-grid's own
+  top margin is topped up dynamically per page in category-page.js so the
+  first item can reach true scroll-snap center, which can push it well
+  past this fixed corner button */
   left: 1.77rem; /* 1.5rem + 10% of the button's own ~43px width */
   z-index: 10;
   display: inline-flex;
@@ -163,8 +175,18 @@ body {
 
 .project-grid {
   max-width: 1000px;
-  margin: 6rem auto 0;
-  padding: 0 2rem;
+  /* Generous top/bottom margin so the gallery reads as its own space
+     below the banner/back-button (and above the page's own end), not
+     butted right up against them — this is the base spacing for the
+     no-JS/reduced-motion static gallery (no scroll-snap in that case, so
+     this is plenty). With scroll-snap active, category-page.js tops
+     both of these up per page to whatever the first/last item's own
+     height actually needs (see applyEdgeSpacing) — and, for a tall
+     first item, also sets its scroll-snap target to this same 12rem so
+     the snap point doesn't pull it in tighter than this margin already
+     gives it (see applySnapAlignment's TOP_SPACING_PX). */
+  margin: 12rem auto 0;
+  padding: 0 2rem 10rem;
 }
 
 .project-grid .grid-inner {
@@ -194,10 +216,20 @@ body {
 
 .gallery-item {
   width: 100%;
-  margin-bottom: 4rem;
+  margin-bottom: 7rem;
   text-align: center;
   scroll-snap-align: center;
   scroll-snap-stop: always;
+  /* Pulls the snap area's bottom edge up to the media's own bottom edge
+     (see wireScrollFocus's setSnapCompensation in category-page.js,
+     which sets this to each item's own -figcaption-height) — without
+     it, "center" would center the item's full box (image + caption),
+     landing the image itself above true center. Kept on this element
+     rather than the media child because the media child's transform is
+     rewritten every frame by the focus effect below, and a scroll-snap
+     target whose own geometry keeps shifting mid-scroll makes for an
+     unstable, jittery snap point. 0 until JS measures the real caption. */
+  scroll-margin-bottom: 0px;
 }
 
 .gallery-item:last-child {
@@ -344,7 +376,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.425rem;
-  margin-top: 1.8rem;
+  margin-top: 2.75rem;
   padding: 0.51rem 0.935rem;
   border: 1.3px solid #1a1a1a;
   border-radius: 999px;

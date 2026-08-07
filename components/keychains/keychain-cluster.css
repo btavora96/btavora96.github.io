@@ -269,18 +269,15 @@
     /* Sized from the real alpha bounds of every layer (BG + all 4 tags),
        not just the carabiner — BRANDING-KC's own artwork reaches down to
        ~89% of the canvas (well past BG's own ~67%), so a box sized only
-       around the carabiner was clipping the bottom of that tag. This
-       covers the full measured range (~7%–89%) plus a couple of points
-       of margin on each side, so nothing is ever hard-cropped — only a
-       sliver of genuinely empty canvas above/below the artwork is
-       trimmed, same idea as the desktop version's canvas shifting
-       partly above the viewport. */
-    aspect-ratio: 2 / 2.61;
+       around the carabiner was clipping the bottom of that tag. No
+       mobile override on --kc-rest-y below: it now reuses the same -20%
+       as desktop, so the carabiner's top is covered by the same amount
+       on both — this box is sized (72% of the canvas's own 2:3 ratio)
+       to match that offset while still keeping the lowest tag's ~89%
+       comfortably inside, instead of the taller box the previous, more
+       conservative offset needed. */
+    aspect-ratio: 2 / 2.16;
     overflow: hidden;
     margin: 0 auto;
-  }
-
-  .keychain-canvas {
-    --kc-rest-y: -5%;
   }
 }
