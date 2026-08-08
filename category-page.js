@@ -75,6 +75,7 @@
   function wireToggle(button, wrap) {
     if (!button || !wrap) return;
     var region = (button.closest && button.closest("figcaption")) || wrap;
+    var scrollYBeforeReading = null;
 
     button.addEventListener("click", function () {
       var opening = !button.classList.contains("is-open");
@@ -82,14 +83,36 @@
       wrap.classList.toggle("is-open");
 
       if (opening) {
+        scrollYBeforeReading = window.scrollY;
         document.documentElement.classList.add(READING_CLASS);
         galleryScrollControl.pause();
         window.setTimeout(function () {
           scrollRegionIntoReadingView(region);
         }, INFO_TRANSITION_MS);
       } else {
-        document.documentElement.classList.remove(READING_CLASS);
-        galleryScrollControl.resume();
+        // Simply flipping scroll-snap back on here and letting the
+        // browser resolve it natively is what used to cause the "sudden
+        // jump" back: that correction is instant, not animated, and can
+        // easily be 100-200px if reading nudged the page away from
+        // wherever it would otherwise have settled. Rather than trying
+        // to recompute "the" correct snap point ourselves (fragile —
+        // tall items in particular don't have a single one; the user
+        // could have opened the info panel from anywhere along a long
+        // scroll-through), the simpler and more honest fix is to ease
+        // back to the exact spot the page was already at *before* it
+        // moved for reading. Native snap, re-enabled a moment later,
+        // then has nothing meaningful left to correct.
+        window.setTimeout(function () {
+          var reducedMotion = window.matchMedia &&
+            window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+          if (scrollYBeforeReading !== null && Math.abs(window.scrollY - scrollYBeforeReading) >= 8) {
+            window.scrollTo({ top: scrollYBeforeReading, behavior: reducedMotion ? "instant" : "smooth" });
+          }
+          window.setTimeout(function () {
+            document.documentElement.classList.remove(READING_CLASS);
+            galleryScrollControl.resume();
+          }, 650);
+        }, INFO_TRANSITION_MS);
       }
     });
   }
@@ -330,6 +353,38 @@
     // scripts at all, so a real preserved scroll position is never here
     // to clobber.
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+
+    // On some pages that forced reset still isn't the final word: the
+    // browser can re-resolve mandatory snap a second time shortly after
+    // load (observed ~200-300ms in, likely triggered by a late layout
+    // shift — e.g. a @font-face swap changing the caption's measured
+    // height) and land somewhere that matches neither the old default
+    // nor the alignment set above. Since there's no reliable signal for
+    // *why* it moved, this instead watches for the effect: any scroll
+    // event in the first second after load that fires before the user
+    // has actually touched the page is that browser-driven correction,
+    // not a real one, and gets undone once. A genuine user scroll
+    // (flagged the moment any input starts) is never touched.
+    var userInteracted = false;
+    ["pointerdown", "wheel", "touchstart", "keydown"].forEach(function (type) {
+      window.addEventListener(type, function () { userInteracted = true; }, { once: true, passive: true });
+    });
+    var loadStamp = performance.now();
+    var undidAutoScroll = false;
+    window.addEventListener("scroll", function onEarlyAutoScroll() {
+      if (undidAutoScroll || userInteracted) {
+        window.removeEventListener("scroll", onEarlyAutoScroll);
+        return;
+      }
+      if (performance.now() - loadStamp > 1000) {
+        window.removeEventListener("scroll", onEarlyAutoScroll);
+        return;
+      }
+      if (window.scrollY === 0) return; // nothing to undo yet
+      undidAutoScroll = true;
+      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+      window.removeEventListener("scroll", onEarlyAutoScroll);
+    }, { passive: true });
 
     function clamp(value, min, max) {
       return Math.max(min, Math.min(max, value));
