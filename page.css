@@ -64,7 +64,6 @@ body {
 @media (max-width: 600px) {
   body {
     background-size: 200px 200px, 100% 100%, 100% 100%, cover;
-    background-attachment: scroll, scroll, scroll, scroll;
   }
 }
 

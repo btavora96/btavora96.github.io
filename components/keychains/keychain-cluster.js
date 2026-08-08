@@ -72,11 +72,20 @@
   // unison. Damping sits a little under critical for each one (see the
   // integration in wireHeroMotion) — enough for one small, natural
   // overshoot while settling, not a repeating bounce.
+  //
+  // Stiffness/damping run roughly 2x/1.4x their original values (same
+  // damping *ratio*, just a higher natural frequency) — at the old,
+  // gentler numbers each tag took long enough to catch up to the
+  // cluster's own cursor-follow signal that the hero read as several
+  // independently-lagging pieces instead of one object responding to
+  // the cursor together. Tightening the response is what brings that
+  // "everything shifts together" feel back while keeping each tag's
+  // own relative character (still four different speeds/weights).
   var SPRINGS = {
-    web: { mass: 1.05, stiffness: 30, damping: 7.4, sensitivity: 2.1, idleAmp: 0.4, idlePeriod: 5.4, idlePhase: 0.6, kick: 6, entryDelayMs: 50 },
-    star: { mass: 0.9, stiffness: 34, damping: 6.6, sensitivity: 2.5, idleAmp: 0.45, idlePeriod: 4.7, idlePhase: 2.1, kick: -7, entryDelayMs: 160 },
-    branding: { mass: 1.4, stiffness: 21, damping: 7.8, sensitivity: 1.5, idleAmp: 0.3, idlePeriod: 6.6, idlePhase: 3.4, kick: 4.5, entryDelayMs: 270 },
-    social: { mass: 0.72, stiffness: 42, damping: 6, sensitivity: 2.9, idleAmp: 0.5, idlePeriod: 3.9, idlePhase: 1.2, kick: -8.5, entryDelayMs: 380 }
+    web: { mass: 1.05, stiffness: 60, damping: 10.5, sensitivity: 2.1, idleAmp: 0.4, idlePeriod: 5.4, idlePhase: 0.6, kick: 6, entryDelayMs: 50 },
+    star: { mass: 0.9, stiffness: 68, damping: 9.3, sensitivity: 2.5, idleAmp: 0.45, idlePeriod: 4.7, idlePhase: 2.1, kick: -7, entryDelayMs: 160 },
+    branding: { mass: 1.4, stiffness: 42, damping: 11, sensitivity: 1.5, idleAmp: 0.3, idlePeriod: 6.6, idlePhase: 3.4, kick: 4.5, entryDelayMs: 270 },
+    social: { mass: 0.72, stiffness: 84, damping: 8.5, sensitivity: 2.9, idleAmp: 0.5, idlePeriod: 3.9, idlePhase: 1.2, kick: -8.5, entryDelayMs: 380 }
   };
 
   /**
@@ -84,14 +93,19 @@
    * individual tag.
    *
    * The cluster itself gets a gentle idle float (never reads as
-   * perfectly inert) and a heavily-damped cursor-follow parallax — like
-   * gently swinging the backpack the keys hang off. Each tag is then a
-   * damped spring hanging off THAT signal, rotating around its own ring
-   * (see the per-tag transform-origin in keychain-cluster.css) rather
-   * than in lockstep — a real pendulum, not four copies of one
-   * animation. On the phone layout (in normal flow, unlike desktop's
-   * fixed position) the cluster also gets a scroll parallax as it
-   * scrolls past.
+   * perfectly inert) and a spring-driven cursor-follow reaction — the
+   * "carabiner" being nudged by the mouse, with real inertia (it
+   * accelerates in, carries a touch past the target, eases back) rather
+   * than a flat lerp that only ever trails the pointer. Each tag is
+   * then its OWN damped spring hanging off that same carabiner signal,
+   * rotating around its own ring (see the per-tag transform-origin in
+   * keychain-cluster.css) rather than in lockstep — the hover force
+   * propagates carabiner → each tag, so the whole assembly reacts as
+   * one connected system, just not identically (each tag's own
+   * mass/stiffness/damping still gives it a different lag, overshoot,
+   * and settle time). On the phone layout (in normal flow, unlike
+   * desktop's fixed position) the cluster also gets a scroll parallax
+   * as it scrolls past.
    *
    * One continuous rAF loop drives all of it, recomputing and
    * integrating every frame — that per-frame physics is what gives the
@@ -108,8 +122,21 @@
 
     var targetX = 0;
     var targetY = 0;
-    var curX = 0;
-    var curY = 0;
+    // The carabiner's own reaction to the cursor — a real damped spring
+    // (mass 1), not a flat exponential lerp. A lerp always eases
+    // monotonically toward its target and can never overshoot, so the
+    // "whole assembly" responding to the cursor never actually had any
+    // momentum of its own — it just trailed the pointer a beat late.
+    // A spring gives it genuine inertia instead: it accelerates into
+    // the motion, carries slightly past the target, and eases back —
+    // "someone nudged the bag" rather than "this value chases the
+    // mouse." Every tag's own sway (below) is driven off this same
+    // signal, so its livelier motion propagates through the whole
+    // group instead of staying isolated to the cluster shell.
+    var CARABINER_STIFFNESS = 36;
+    var CARABINER_DAMPING = 8.2;
+    var carX = { pos: 0, vel: 0 };
+    var carY = { pos: 0, vel: 0 };
 
     if (!coarse) {
       window.addEventListener("pointermove", function (e) {
@@ -159,11 +186,17 @@
       var floatY = Math.sin((t * Math.PI * 2) / 6) * 5 * idleScale;
       var floatRy = Math.sin((t * Math.PI * 2) / 9) * 0.5 * idleScale;
 
-      // cursor-follow — heavily damped so it trails the pointer rather
-      // than tracking it directly, reading as inertia/weight (this is
-      // the "backpack" the individual keychains below react to)
-      curX += (targetX - curX) * 0.035;
-      curY += (targetY - curY) * 0.035;
+      // carabiner spring integration (semi-implicit Euler, same pattern
+      // as each tag's own spring below) — this is the "backpack" sway
+      // the individual keychains react to in turn
+      var carAccelX = (-CARABINER_STIFFNESS * (carX.pos - targetX) - CARABINER_DAMPING * carX.vel);
+      carX.vel += carAccelX * dt;
+      carX.pos += carX.vel * dt;
+      var carAccelY = (-CARABINER_STIFFNESS * (carY.pos - targetY) - CARABINER_DAMPING * carY.vel);
+      carY.vel += carAccelY * dt;
+      carY.pos += carY.vel * dt;
+      var curX = carX.pos;
+      var curY = carY.pos;
 
       // scroll parallax — only meaningful once the cluster is actually
       // in flow (the phone layout); position:fixed on desktop never
@@ -177,11 +210,15 @@
         scrollOpacity = 1 - progress * 0.6;
       }
 
+      // Multipliers scaled up from the original lerp-driven values now
+      // that curX/curY have real spring dynamics behind them — clearly
+      // noticeable movement across the whole shell without tipping into
+      // exaggerated territory.
       var style = cluster.style;
-      style.setProperty("--kc-x", (curX * 8).toFixed(2) + "px");
-      style.setProperty("--kc-y", (curY * 6 + floatY + scrollY).toFixed(2) + "px");
-      style.setProperty("--kc-rx", (-curY * 1.6).toFixed(3) + "deg");
-      style.setProperty("--kc-ry", (curX * 2.2 + floatRy).toFixed(3) + "deg");
+      style.setProperty("--kc-x", (curX * 13).toFixed(2) + "px");
+      style.setProperty("--kc-y", (curY * 9 + floatY + scrollY).toFixed(2) + "px");
+      style.setProperty("--kc-rx", (-curY * 2.3).toFixed(3) + "deg");
+      style.setProperty("--kc-ry", (curX * 3.2 + floatRy).toFixed(3) + "deg");
       style.opacity = scrollOpacity.toFixed(3);
 
       // each keychain: a damped spring (semi-implicit Euler) chasing a
@@ -324,13 +361,14 @@
     // "everything is ready" gate looked like a random pop-in race.
     // kc-ready fades the carabiner in first, then each tag "attached"
     // shortly after with its own stagger (see keychain-cluster.css);
-    // kick() sets off each tag's entrance swing on that same stagger,
-    // and only once the slowest of them has had time to settle does the
-    // intro text get cleared to fade in (see body.kc-settled in
-    // page.css) — the text waits for the object it's introducing to
-    // feel stable instead of appearing at the same instant as everything
-    // else.
-    var SETTLE_MS = prefersReducedMotion() ? 0 : 1800;
+    // kick() sets off each tag's entrance swing on that same stagger.
+    // The intro text used to wait out a long settle timer before
+    // fading in on its own, well after the keychain — now it's cleared
+    // to fade in at the very same moment, so the two entrances read as
+    // one single arrival instead of the hero appearing and the text
+    // catching up a beat later. Its own CSS transition (see .info-box
+    // in page.css) still carries the actual fade/rise, so it isn't
+    // instant, just no longer delayed.
     var allImgs = [bg].concat(items.map(function (entry) { return entry.img; }));
     Promise.all(allImgs.map(function (img) {
       if (img.decode) return img.decode().catch(function () {});
@@ -342,9 +380,7 @@
     })).then(function () {
       canvas.classList.add("kc-ready");
       heroMotion.kick();
-      window.setTimeout(function () {
-        document.body.classList.add("kc-settled");
-      }, SETTLE_MS);
+      document.body.classList.add("kc-settled");
     });
 
     // optional "you are here": set data-current-key="branding" (etc) on the

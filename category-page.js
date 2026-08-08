@@ -330,7 +330,7 @@
       var lastHeight = entries[entries.length - 1].media.getBoundingClientRect().height;
       var bottomNeeded = Math.max(0, (vh - lastHeight) / 2) + 24;
       grid.style.marginTop = TOP_SPACING_PX + "px";
-      grid.style.paddingBottom = "max(10rem, " + bottomNeeded + "px)";
+      grid.style.paddingBottom = "max(14rem, " + bottomNeeded + "px)";
     }
     applyEdgeSpacing();
     window.addEventListener("resize", applyEdgeSpacing);
@@ -407,20 +407,17 @@
     // by the time it's settling into place, not just once it's dead still.
     var FOCUS_SPAN_FACTOR = 0.6;
     // How much of the caption/buttons needs to have scrolled into view
-    // (in px) before a tall item counts as fully "released" — short on
-    // purpose. The image's own bottom edge crosses the *entire* viewport
-    // height before it's gone, so tying release to that full distance
-    // (as enter does, in reverse) would keep it scaled up, bright and
-    // glowing well after the caption has already scrolled into view —
-    // exactly the "fighting the image for attention" this exists to
-    // avoid. Releasing over a short, fixed distance instead means the
-    // image is already calm by the time there's enough room to
-    // comfortably read the caption and reach the button. 420px (was
-    // 280) gives the very bottom of a tall piece a little longer to
-    // settle before that handoff starts, without stretching it back out
-    // anywhere near the old full-viewport release. 480 (was 420) gives
-    // a little more of that settle time again.
-    var EXIT_RELEASE_PX = 480;
+    // (in px) before a tall item counts as fully "released". Tying
+    // release to the image's own bottom edge crossing the *entire*
+    // viewport height (as enter does, in reverse) would keep it scaled
+    // up and glowing long after the caption has already scrolled into
+    // view — the "fighting the image for attention" this exists to
+    // avoid — but too short a distance is its own problem: the bottom
+    // of a tall piece barely gets seen before the handoff starts,
+    // reading as the gallery rushing to the next project. 650 (up from
+    // 420, then 480) gives real, deliberate scroll distance to actually
+    // look at the lower section of the artwork before it lets go.
+    var EXIT_RELEASE_PX = 650;
 
     function tick() {
       if (galleryPaused) {

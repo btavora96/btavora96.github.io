@@ -186,7 +186,7 @@ body {
      the snap point doesn't pull it in tighter than this margin already
      gives it (see applySnapAlignment's TOP_SPACING_PX). */
   margin: 12rem auto 0;
-  padding: 0 2rem 10rem;
+  padding: 0 2rem 14rem;
 }
 
 .project-grid .grid-inner {
@@ -216,7 +216,15 @@ body {
 
 .gallery-item {
   width: 100%;
-  margin-bottom: 7rem;
+  /* The actual "how long does this project stay on screen" control:
+     scroll-snap-stop below guarantees a scroll gesture can't skip past
+     an item, but with a small gap the *distance* between one item's
+     snap point and the next was short enough that a couple of ticks
+     covered it — reading as the gallery rushing to the next project.
+     A more generous gap means genuinely more scrolling (not waiting)
+     is needed to get there, which is what actually slows the felt
+     pace down without touching any timing. */
+  margin-bottom: 10rem;
   text-align: center;
   scroll-snap-align: center;
   scroll-snap-stop: always;
@@ -377,7 +385,10 @@ body {
   align-items: center;
   gap: 0.425rem;
   margin-top: 2.75rem;
-  padding: 0.51rem 0.935rem;
+  /* Sized up from a bare 0.51rem/0.935rem — that pill was well under a
+     comfortable tap/click target (its own box worked out to under
+     30px tall). Same pill silhouette, just roomier. */
+  padding: 0.8rem 1.35rem;
   border: 1.3px solid #1a1a1a;
   border-radius: 999px;
   background: transparent;
@@ -468,7 +479,13 @@ body {
 .gallery-item.is-open .gallery-subtitle {
   opacity: 1;
   transform: translateY(0);
-  max-height: 2rem;
+  /* Generous enough for a real paragraph of project description, not
+     just the current one-line placeholder — and if the text is ever
+     genuinely longer than that, it scrolls within its own box instead
+     of silently clipping or forcing the whole gallery to fight the
+     reader for space. */
+  max-height: min(45vh, 26rem);
+  overflow-y: auto;
   margin-top: 0.5rem;
 }
 
@@ -489,7 +506,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.425rem;
-  padding: 0.51rem 0.935rem;
+  padding: 0.8rem 1.35rem;
   border: 1.3px solid #1a1a1a;
   border-radius: 999px;
   background: transparent;
@@ -584,7 +601,8 @@ body {
 .cta-wrap.is-open .cta-subtitle {
   opacity: 1;
   transform: translateY(0);
-  max-height: 2rem;
+  max-height: min(45vh, 26rem);
+  overflow-y: auto;
   margin-top: 0.5rem;
 }
 
