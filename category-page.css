@@ -397,60 +397,36 @@ body {
   right: -3.25rem;
 }
 
+/* Bare "+" pill, styled identically to .back-button — same border weight,
+   padding, radius and glyph font, just showing "+" instead of "×". Click
+   opens .gallery-subtitle below it (see category-page.js); the icon
+   itself rotates 45deg on open, turning the "+" into a "×" as the only
+   visual cue, matching the back-button's own glyph. */
 .gallery-caption {
   display: inline-flex;
   align-items: center;
-  gap: 0.425rem;
+  justify-content: center;
   margin-top: 2.75rem;
-  /* Sized up from a bare 0.51rem/0.935rem — that pill was well under a
-     comfortable tap/click target (its own box worked out to under
-     30px tall). Same pill silhouette, just roomier. */
-  padding: 0.8rem 1.35rem;
-  border: 1.3px solid #1a1a1a;
+  padding: 0.4rem 0.65rem;
+  border: 1.2px solid #1a1a1a;
   border-radius: 999px;
   background: transparent;
   cursor: pointer;
   transition: border-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-              background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-              padding 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-              gap 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+              background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.gallery-label {
-  font-family: "Ouma Devanagari", sans-serif;
-  font-weight: 400;
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #1a1a1a;
-  transition: font-weight 0.25s ease,
-              font-size 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-              letter-spacing 0.6s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* scaled ~15% down from a prior 19.8px/12.1px pass, matching the page-level CTA icon */
 .gallery-icon {
-  width: 16.8px;
-  height: 16.8px;
-  border-radius: 50%;
-  border: 1.3px solid currentColor;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-family: "Ouma Devanagari", sans-serif;
   font-weight: 400;
-  font-size: 10.3px;
+  font-size: 0.75rem;
   line-height: 1;
   color: #1a1a1a;
-  transition: font-weight 0.25s ease, opacity 0.3s ease, transform 0.3s ease,
-              width 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-width 0.4s ease;
+  transition: font-weight 0.25s ease, transform 0.3s ease;
 }
 
-/* hovering/focusing the thumbnail bolds its name below — reversible, and
-   only while still a pill (not yet unwrapped). */
-.gallery-item:not(.is-open):hover .gallery-label,
-.gallery-item:not(.is-open):focus-within .gallery-label,
-.gallery-caption:active .gallery-label,
+/* hovering/focusing the thumbnail bolds the "+" — reversible, and only
+   while still closed (not yet open). */
 .gallery-item:not(.is-open):hover .gallery-icon,
 .gallery-item:not(.is-open):focus-within .gallery-icon,
 .gallery-caption:active .gallery-icon {
@@ -471,26 +447,13 @@ body {
               max-height 0.5s cubic-bezier(0.22, 1, 0.36, 1), margin-top 0.5s ease;
 }
 
-/* click: box disappears, name grows into a bare heading, subtitle fades
-   in below it. Toggles back to the pill on a second click. */
-.gallery-caption.is-open {
-  gap: 0;
-  border-color: transparent;
-  background: transparent;
-  padding: 0.6rem 0;
-}
-
-.gallery-caption.is-open .gallery-label {
-  font-size: 1.7rem;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-}
-
+/* click: the pill itself stays put — only the subtitle below it opens.
+   The "+" simply rotates into a "×" as the only cue the pill is now
+   open. Toggles back on a second click (or automatically once the user
+   scrolls — see wireToggle in category-page.js). */
 .gallery-caption.is-open .gallery-icon {
-  width: 0;
-  border-width: 0;
-  opacity: 0;
-  transform: scale(0.4);
+  font-weight: 700;
+  transform: rotate(45deg);
 }
 
 .gallery-item.is-open .gallery-subtitle {

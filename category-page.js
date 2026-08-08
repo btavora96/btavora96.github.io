@@ -42,9 +42,11 @@
   var INFO_TRANSITION_MS = 680;
 
   // Scrolls just enough that `region` (the just-opened figcaption or
-  // cta-wrap) sits in a comfortable reading position — a real top
-  // margin, not merely "technically on screen" — rather than jumping
-  // until its top edge touches the very top of the viewport.
+  // cta-wrap) isn't clipped by the viewport's top or bottom edge. Only
+  // moves the page when something would actually be cut off — a region
+  // that already fits comfortably on screen is left exactly where it
+  // is, rather than being forced up to some fixed "reading" offset it
+  // never needed in the first place.
   function scrollRegionIntoReadingView(region) {
     if (!region) return;
     var reducedMotion = window.matchMedia &&
@@ -57,15 +59,15 @@
     var rect = region.getBoundingClientRect();
     var vh = window.innerHeight;
     var hiddenBelow = rect.bottom - (vh - bottomBreathingRoom);
-    var wantsTopAt = topBreathingRoom;
-    var delta;
-    if (hiddenBelow > 0 && rect.height <= vh - topBreathingRoom - bottomBreathingRoom) {
-      // Tall enough to fit with room to spare but currently spilling
-      // past the bottom — bring the bottom in first, same as the top
-      // case below would, without pulling the top past its own margin.
-      delta = Math.min(hiddenBelow, rect.top - topBreathingRoom);
-    } else {
-      delta = rect.top - wantsTopAt;
+    var hiddenAbove = topBreathingRoom - rect.top;
+
+    var delta = 0;
+    if (hiddenBelow > 0) {
+      // Pull up just enough to bring the clipped part in, but never
+      // further than the point where the top would crowd the banner.
+      delta = Math.min(hiddenBelow, Math.max(0, rect.top - topBreathingRoom));
+    } else if (hiddenAbove > 0) {
+      delta = -hiddenAbove;
     }
 
     if (Math.abs(delta) < 8) return; // already comfortable — a scroll here would just be jitter
@@ -76,32 +78,72 @@
     if (!button || !wrap) return;
     var region = (button.closest && button.closest("figcaption")) || wrap;
     var scrollYBeforeReading = null;
+    var repositionTimer = null;
+    var detachScrollIntent = null;
+
+    function setOpen(isOpen) {
+      button.classList.toggle("is-open", isOpen);
+      wrap.classList.toggle("is-open", isOpen);
+    }
+
+    function cancelPendingReposition() {
+      if (repositionTimer !== null) {
+        window.clearTimeout(repositionTimer);
+        repositionTimer = null;
+      }
+    }
+
+    // While reading, any real scroll input from the user (wheel, touch
+    // drag, arrow/space/page keys) means they're done reading and are
+    // actively trying to move the page — not that they want to be
+    // pulled back to where they started. Closing immediately and hand-
+    // ing control straight back to native snap lets that same gesture
+    // carry them on to the next project instead of fighting it.
+    function attachScrollIntent() {
+      function onIntent() {
+        if (detachScrollIntent) detachScrollIntent();
+        cancelPendingReposition();
+        setOpen(false);
+        document.documentElement.classList.remove(READING_CLASS);
+        galleryScrollControl.resume();
+      }
+      function onKey(e) {
+        var keys = ["ArrowDown", "ArrowUp", "PageDown", "PageUp", " ", "Spacebar"];
+        if (keys.indexOf(e.key) !== -1) onIntent();
+      }
+      window.addEventListener("wheel", onIntent, { passive: true, once: true });
+      window.addEventListener("touchmove", onIntent, { passive: true, once: true });
+      window.addEventListener("keydown", onKey);
+      detachScrollIntent = function () {
+        window.removeEventListener("wheel", onIntent);
+        window.removeEventListener("touchmove", onIntent);
+        window.removeEventListener("keydown", onKey);
+        detachScrollIntent = null;
+      };
+    }
 
     button.addEventListener("click", function () {
       var opening = !button.classList.contains("is-open");
-      button.classList.toggle("is-open");
-      wrap.classList.toggle("is-open");
+      setOpen(opening);
 
       if (opening) {
         scrollYBeforeReading = window.scrollY;
         document.documentElement.classList.add(READING_CLASS);
         galleryScrollControl.pause();
+        attachScrollIntent();
         // A tall item's figcaption is already snap-aligned "end" (see
         // applySnapAlignment) — its own resting position already puts
         // it right at the bottom of the viewport with the artwork
-        // above it, exactly the comfortable spot scrollRegionIntoView
-        // would otherwise try to move it to. Calling that here would
-        // instead push the whole tall image up to make room near the
-        // *top* of the screen, which for a piece already close to a
-        // page boundary can easily read as jumping into the next
-        // project. Short items don't have this second, self-positioned
-        // stop, so they still get the explicit reposition.
+        // above it, so it never needs the explicit reposition below.
         if (!wrap.classList.contains("gallery-item--tall")) {
-          window.setTimeout(function () {
+          repositionTimer = window.setTimeout(function () {
+            repositionTimer = null;
             scrollRegionIntoReadingView(region);
           }, INFO_TRANSITION_MS);
         }
       } else {
+        if (detachScrollIntent) detachScrollIntent();
+        cancelPendingReposition();
         // Simply flipping scroll-snap back on here and letting the
         // browser resolve it natively is what used to cause the "sudden
         // jump" back: that correction is instant, not animated, and can
