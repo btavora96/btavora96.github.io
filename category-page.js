@@ -86,22 +86,32 @@
         scrollYBeforeReading = window.scrollY;
         document.documentElement.classList.add(READING_CLASS);
         galleryScrollControl.pause();
-        window.setTimeout(function () {
-          scrollRegionIntoReadingView(region);
-        }, INFO_TRANSITION_MS);
+        // A tall item's figcaption is already snap-aligned "end" (see
+        // applySnapAlignment) — its own resting position already puts
+        // it right at the bottom of the viewport with the artwork
+        // above it, exactly the comfortable spot scrollRegionIntoView
+        // would otherwise try to move it to. Calling that here would
+        // instead push the whole tall image up to make room near the
+        // *top* of the screen, which for a piece already close to a
+        // page boundary can easily read as jumping into the next
+        // project. Short items don't have this second, self-positioned
+        // stop, so they still get the explicit reposition.
+        if (!wrap.classList.contains("gallery-item--tall")) {
+          window.setTimeout(function () {
+            scrollRegionIntoReadingView(region);
+          }, INFO_TRANSITION_MS);
+        }
       } else {
         // Simply flipping scroll-snap back on here and letting the
         // browser resolve it natively is what used to cause the "sudden
         // jump" back: that correction is instant, not animated, and can
         // easily be 100-200px if reading nudged the page away from
         // wherever it would otherwise have settled. Rather than trying
-        // to recompute "the" correct snap point ourselves (fragile —
-        // tall items in particular don't have a single one; the user
-        // could have opened the info panel from anywhere along a long
-        // scroll-through), the simpler and more honest fix is to ease
-        // back to the exact spot the page was already at *before* it
-        // moved for reading. Native snap, re-enabled a moment later,
-        // then has nothing meaningful left to correct.
+        // to recompute "the" correct snap point ourselves, the simpler
+        // and more honest fix is to ease back to the exact spot the
+        // page was already at *before* it moved for reading. Native
+        // snap, re-enabled a moment later, then has nothing meaningful
+        // left to correct.
         window.setTimeout(function () {
           var reducedMotion = window.matchMedia &&
             window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -220,80 +230,64 @@
     galleryScrollControl.pause = function () { galleryPaused = true; };
     galleryScrollControl.resume = function () { galleryPaused = false; };
 
-    // Short items (comfortably fit within the viewport) snap centered —
-    // scroll-snap-align: center centers the *item's* box by default,
-    // which includes the caption below the image, landing the image
-    // itself above true center. Shrinking the snap area's bottom edge up
-    // to the media's own bottom (a negative scroll-margin-bottom, sized
-    // to each item's own caption height) makes the browser center the
-    // image instead.
+    // Most items snap centered as one whole section — image and
+    // caption/button together (see .gallery-item in category-page.css).
+    // Two things override that default:
     //
-    // Tall items (taller than the viewport, e.g. Aurora, Sandsavers,
-    // Crafthouse, Shift Gallery, Zenzoo) can't be "centered" in any
-    // meaningful sense — there's always more of them above and below the
-    // fold no matter where they rest, so centering just means landing
-    // mid-image with neither end in view. Those snap to their own top
-    // edge instead: scrolling in lands at the start of the project, the
-    // rest scrolls normally like any tall page, and the next snap point
-    // only arrives once the user has actually scrolled past its end.
+    // - The very first item always gets a fixed top edge instead —
+    //   centering it would land at whatever scroll position its own
+    //   height happens to need, which is a *different* position on
+    //   every page. Pinning it to the same margin .project-grid itself
+    //   opens with is what makes every category page's gallery start
+    //   at identically the same spot.
     //
-    // Measured via getBoundingClientRect before the rAF loop below has
-    // touched any transforms, so this reads each item's true,
-    // untransformed layout.
+    // - Portrait pieces too tall for their own image+caption section to
+    //   share one screen (Aurora, Crafthouse, Sandsavers, Shift
+    //   Gallery, Zenzoo…) render at full original scale rather than
+    //   being shrunk to fit, and instead get a second stop of their
+    //   own: the item's own top is still the first (as above), and the
+    //   figcaption separately snap-aligns "end" (see .gallery-item--tall
+    //   in category-page.css) so the lower part of the artwork and the
+    //   caption arrive together as a second, deliberate stage — the
+    //   piece is seen in two stops rather than needing to fit whole or
+    //   scrolling through it freely.
     var banner = document.querySelector(".scroll-banner");
     var bannerHeight = banner ? banner.getBoundingClientRect().height : 0;
-    // Same generous top spacing as .project-grid's own margin-top (see
-    // category-page.css) — used below as the snap target for tall items.
-    // This used to just clear the fixed banner (a bare ~88px), which was
-    // nowhere near the page's actual ~192px of top margin: the item sits
-    // correctly on first paint (that's plain layout), but the instant
-    // scroll-snap re-resolves — on the first scroll, even a small one —
-    // it pulls the item up to that much smaller margin instead, reading
-    // as suddenly "stuck to the top." Matching the two numbers is what
-    // keeps the breathing room consistent whether or not a snap has
-    // fired yet.
     var rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
     var TOP_SPACING_PX = Math.max(12 * rootFontSize, bannerHeight + 24);
+    // How much taller than the viewport a piece needs to be before it's
+    // worth splitting into two stops rather than sharing one screen
+    // with its own caption — a little slack above 1.0 so items that
+    // only barely exceed the viewport (and would fit fine with a
+    // little focus falloff) aren't needlessly split.
+    var TALL_RATIO = 1.15;
 
     function applySnapAlignment() {
       var vh = window.innerHeight;
       entries.forEach(function (entry, index) {
-        var itemRect = entry.item.getBoundingClientRect();
-        var mediaRect = entry.media.getBoundingClientRect();
-        var isTall = mediaRect.height > vh;
-        // The very first item is always top-aligned at TOP_SPACING_PX,
-        // even when it's short enough to otherwise qualify for center
-        // snapping — a short first project centering itself lands at
-        // whatever scroll position its own height happens to need,
-        // which is a *different* position on every page. Pinning it to
-        // the same fixed top edge as a tall first item is what makes
-        // every category page's gallery start at identically the same
-        // spot, which center-snapping can't guarantee on its own.
         var isFirst = index === 0;
+        var isTall = entry.media.getBoundingClientRect().height > vh * TALL_RATIO;
+        entry.item.classList.toggle("gallery-item--tall", isTall);
 
-        if (isTall || isFirst) {
+        if (isFirst) {
           entry.item.style.scrollSnapAlign = "start";
           entry.item.style.scrollMarginTop = TOP_SPACING_PX + "px";
-          entry.item.style.scrollMarginBottom = "0px";
+        } else if (isTall) {
+          entry.item.style.scrollSnapAlign = "start";
+          entry.item.style.scrollMarginTop = "0px";
         } else {
           entry.item.style.scrollSnapAlign = "center";
           entry.item.style.scrollMarginTop = "0px";
-          var belowMedia = itemRect.bottom - mediaRect.bottom;
-          entry.item.style.scrollMarginBottom = (-belowMedia) + "px";
         }
       });
     }
     applySnapAlignment();
     window.addEventListener("resize", applySnapAlignment);
 
-    // Most gallery images load lazily (and gallery videos use preload=
-    // "none"), so at the point the calls above first run, anything not
-    // yet on screen still has no known intrinsic size — its media box
-    // reports 0 height, which reads as "short" no matter how tall the
-    // image actually is. Re-running the classification once each one's
-    // real dimensions are in is what lets Crafthouse, Sandsavers, Shift
-    // Gallery, and Zenzoo (all lazy, all off past the first screen) get
-    // picked up as tall too, not just Aurora (the only eager one).
+    // Lazy images/videos (most of them) report 0 height until loaded,
+    // which would misclassify a genuinely tall piece as short. Nothing
+    // else here depends on measured height, so this is the only thing
+    // that needs a re-run once each one's real size is in.
     entries.forEach(function (entry) {
       var media = entry.media;
       var pending =
@@ -301,10 +295,7 @@
         (media.tagName === "VIDEO" && media.readyState < 1);
       if (!pending) return;
       var eventName = media.tagName === "VIDEO" ? "loadedmetadata" : "load";
-      media.addEventListener(eventName, function () {
-        applySnapAlignment();
-        applyEdgeSpacing();
-      }, { once: true });
+      media.addEventListener(eventName, applySnapAlignment, { once: true });
     });
 
     // The top edge is a fixed, page-independent constant (TOP_SPACING_PX
@@ -327,7 +318,10 @@
       var grid = document.querySelector(".project-grid");
       if (!grid) return;
       var vh = window.innerHeight;
-      var lastHeight = entries[entries.length - 1].media.getBoundingClientRect().height;
+      // The whole item now (image + caption), matching what's actually
+      // being centered — using just the media's height here would
+      // undershoot the buffer the caption itself also needs room for.
+      var lastHeight = entries[entries.length - 1].item.getBoundingClientRect().height;
       var bottomNeeded = Math.max(0, (vh - lastHeight) / 2) + 24;
       grid.style.marginTop = TOP_SPACING_PX + "px";
       grid.style.paddingBottom = "max(14rem, " + bottomNeeded + "px)";
@@ -335,14 +329,28 @@
     applyEdgeSpacing();
     window.addEventListener("resize", applyEdgeSpacing);
 
+    // The last item's own height feeds directly into the bottom buffer
+    // above — if it's a lazy-loaded image (most are), it still reports
+    // 0 height at this point, so this recomputes once it's actually
+    // sized. applySnapAlignment no longer depends on any image's
+    // measured height (see above), so it doesn't need the same re-run.
+    (function () {
+      var lastMedia = entries[entries.length - 1].media;
+      var pending =
+        (lastMedia.tagName === "IMG" && !lastMedia.complete) ||
+        (lastMedia.tagName === "VIDEO" && lastMedia.readyState < 1);
+      if (!pending) return;
+      var eventName = lastMedia.tagName === "VIDEO" ? "loadedmetadata" : "load";
+      lastMedia.addEventListener(eventName, applyEdgeSpacing, { once: true });
+    })();
+
     // Scroll-snap can auto-resolve an initial scroll offset from layout
     // alone, as soon as the browser has enough of the page parsed to do
     // so — which can happen before this script has replaced
     // .gallery-item's CSS default (center-align, no top margin) with
-    // the correct per-item values set above. For a tall first item like
-    // Aurora, "center" against a box far taller than the viewport lands
-    // the page already scrolled down, image filling the screen edge to
-    // edge with no margin visible — even though nothing has been
+    // the correct per-item values set above. For the first item, that
+    // means the page can land already centered on it — scrolled well
+    // past the intended top margin — even though nothing has been
     // scrolled yet. A first scroll re-resolves snapping against the by-
     // then-correct alignment and looks right, which is why only
     // scrolling seemed to fix it. Explicitly returning to the top now,
@@ -406,18 +414,13 @@
     // center, the goal is for the project to already read as sharp/focused
     // by the time it's settling into place, not just once it's dead still.
     var FOCUS_SPAN_FACTOR = 0.6;
-    // How much of the caption/buttons needs to have scrolled into view
-    // (in px) before a tall item counts as fully "released". Tying
-    // release to the image's own bottom edge crossing the *entire*
-    // viewport height (as enter does, in reverse) would keep it scaled
-    // up and glowing long after the caption has already scrolled into
-    // view — the "fighting the image for attention" this exists to
-    // avoid — but too short a distance is its own problem: the bottom
-    // of a tall piece barely gets seen before the handoff starts,
-    // reading as the gallery rushing to the next project. 650 (up from
-    // 420, then 480) gives real, deliberate scroll distance to actually
-    // look at the lower section of the artwork before it lets go.
-    var EXIT_RELEASE_PX = 650;
+    // For the tall, two-stop pieces (see applySnapAlignment): how much
+    // of stage two (bottom of the artwork + caption) needs to have
+    // scrolled into view before the piece counts as "released" —
+    // deliberately short, so it's already calm by the time there's
+    // room to read the caption and reach the button, rather than still
+    // scaled up and glowing underneath them.
+    var EXIT_RELEASE_PX = 420;
 
     function tick() {
       if (galleryPaused) {
@@ -428,40 +431,31 @@
       var vh = window.innerHeight;
       var vCenter = vh / 2;
 
-      entries.forEach(function (entry, index) {
-        // The media's own rect, not the item's (which also includes the
-        // caption below it) — this is what scroll-snap now actually
-        // centers (see applySnapAlignment above), so "in focus" should
-        // peak at the same point "centered" means to the browser.
+      entries.forEach(function (entry) {
         var rect = entry.media.getBoundingClientRect();
-        var isTall = rect.height > vh;
-        var isFirst = index === 0;
+        var isTall = rect.height > vh * 1.15;
         var focus, yTarget;
 
-        if (isTall || isFirst) {
-          // Taller-than-viewport items (Aurora, Sandsavers, Crafthouse,
-          // Shift Gallery, Zenzoo…) are never resized to fit and never
-          // centered — there's no single "centered" position that makes
-          // sense for something bigger than the screen. Instead focus
-          // ramps up as the image's own top edge scrolls up through the
-          // viewport (enterFocus), holds at full focus for as long as
-          // the image still fills the whole screen (both ramps clamped
-          // at 1), and only ramps back down as its bottom edge scrolls
-          // through and off the top (exitFocus) — so the piece reads as
-          // sharp for the entire time it's actually being read, and the
-          // soft blur/dim is only ever an entrance/exit transition, not
-          // something fought against mid-scroll.
-          // Reaches full focus exactly when the item settles into its
-          // own actual resting position (TOP_SPACING_PX from the top —
-          // see applySnapAlignment), not an arbitrary "all the way to
-          // the very top of the viewport" that a start-aligned item
-          // never fully reaches anyway.
-          var enterFocus = clamp((vh - rect.top) / Math.max(vh - TOP_SPACING_PX, 100), 0, 1);
+        if (isTall) {
+          // Two-stop pieces: focus ramps up as the artwork's own top
+          // edge scrolls up through the viewport — reaching full focus
+          // once it's fully entered — holds there for as long as any
+          // part of it still fills the screen, and only ramps back
+          // down once stage two (bottom of the artwork + caption) has
+          // had a chance to actually be seen. No centering nudge: it
+          // was never being pulled toward a center point.
+          var enterFocus = clamp((vh - rect.top) / vh, 0, 1);
           var afterVisible = vh - rect.bottom; // px of caption/gap already scrolled into view
           var exitFocus = clamp(1 - afterVisible / EXIT_RELEASE_PX, 0, 1);
           focus = smoothstep(Math.min(enterFocus, exitFocus));
-          yTarget = 0; // no centering nudge — it isn't being pulled toward a center point
+          yTarget = 0;
         } else {
+          // The media's own rect — short/normal items are already well
+          // under the viewport height, so this distance-from-center
+          // falloff works cleanly for all of them, including the first
+          // (start-aligned for cross-page consistency rather than
+          // centered, but still short enough it settles very close to
+          // its own peak focus anyway).
           var itemCenter = rect.top + rect.height / 2;
           var span = (vh / 2 + rect.height / 2) * FOCUS_SPAN_FACTOR;
           var dist = span > 0 ? clamp((itemCenter - vCenter) / span, -1, 1) : 0;

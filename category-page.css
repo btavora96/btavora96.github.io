@@ -224,20 +224,21 @@ body {
      A more generous gap means genuinely more scrolling (not waiting)
      is needed to get there, which is what actually slows the felt
      pace down without touching any timing. */
-  margin-bottom: 10rem;
+  margin-bottom: 13rem;
   text-align: center;
+  /* Centers the *whole* item — image and caption/button together, as
+     one section — not just the image with the caption excluded (see
+     category-page.js, which used to compensate this with a negative
+     scroll-margin-bottom so only the image landed centered). The
+     button was then a further scroll away from wherever the gallery
+     actually stopped; now it's already on screen the moment its
+     project settles into place. This default is what short/normal
+     items use as-is; category-page.js overrides it per item for the
+     first item (fixed top edge, for cross-page consistency — see
+     applySnapAlignment) and for tall portrait pieces (see
+     .gallery-item--tall below, a second stop rather than one section). */
   scroll-snap-align: center;
   scroll-snap-stop: always;
-  /* Pulls the snap area's bottom edge up to the media's own bottom edge
-     (see wireScrollFocus's setSnapCompensation in category-page.js,
-     which sets this to each item's own -figcaption-height) — without
-     it, "center" would center the item's full box (image + caption),
-     landing the image itself above true center. Kept on this element
-     rather than the media child because the media child's transform is
-     rewritten every frame by the focus effect below, and a scroll-snap
-     target whose own geometry keeps shifting mid-scroll makes for an
-     unstable, jittery snap point. 0 until JS measures the real caption. */
-  scroll-margin-bottom: 0px;
 }
 
 .gallery-item:last-child {
@@ -249,6 +250,22 @@ body {
   display: block;
   width: 100%;
   height: auto;
+}
+
+/* Portrait pieces tall enough that the whole image+caption section
+   can't reasonably share one screen (Aurora, Crafthouse, Sandsavers,
+   Shift Gallery, Zenzoo…) render at their original scale — no cap —
+   and instead get a second scroll-snap stop of their own. See
+   applySnapAlignment in category-page.js: the item's own top is the
+   first stop (as for every item), and .gallery-item--tall figcaptions
+   additionally snap-align "end", landing the lower part of the artwork
+   plus the caption together as the second, so the piece is seen in two
+   deliberate stages rather than needing to fit whole or scrolling
+   through it freely. Short/normal work never gets this class and is
+   unaffected. */
+.gallery-item--tall figcaption {
+  scroll-snap-align: end;
+  scroll-snap-stop: always;
 }
 
 /* Scroll-driven focus effect (see wireScrollFocus in category-page.js):
