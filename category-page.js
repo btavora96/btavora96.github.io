@@ -74,6 +74,15 @@
     window.scrollBy({ top: delta, behavior: reducedMotion ? "instant" : "smooth" });
   }
 
+  // Branding's project pages use a different interaction entirely (see
+  // body.project-reveal in branding.html): a single floating "+"/"×"
+  // button follows whichever project is currently in focus, sliding
+  // that project's image left to reveal a text panel beside it — see
+  // wireFloatingCaption inside wireScrollFocus. Social/Web Design keep
+  // this original per-item pill that toggles open and closed on
+  // repeated clicks.
+  var REVEAL_MODE = document.body.classList.contains("project-reveal");
+
   function wireToggle(button, wrap) {
     if (!button || !wrap) return;
     var region = (button.closest && button.closest("figcaption")) || wrap;
@@ -250,13 +259,22 @@
 
     var items = Array.prototype.slice.call(document.querySelectorAll(".gallery-item"));
     var entries = items.map(function (item) {
-      var media = item.querySelector(":scope > img, :scope > .gallery-video, :scope > .gallery-frame-wrap");
+      // Branding (REVEAL_MODE) nests its media one level deeper, inside
+      // .gallery-media, alongside the text panel it slides beside —
+      // everything else still has the image/video as .gallery-item's
+      // own direct child.
+      var media = item.querySelector(
+        ":scope > img, :scope > .gallery-video, :scope > .gallery-frame-wrap, " +
+        ":scope > .gallery-media > img, :scope > .gallery-media > .gallery-video"
+      );
       if (!media) return null;
       return {
         item: item,
         media: media,
+        label: media.getAttribute("alt") || media.getAttribute("aria-label") || "",
+        description: item.getAttribute("data-description") || "",
         cur: {
-          scale: 1, y: 0, opacity: 1, brightness: 1, contrast: 1,
+          scale: 1, y: 0, slideX: 0, opacity: 1, brightness: 1, contrast: 1,
           blur: 0, shadowBlur: 16, shadowAlpha: 0.1
         }
       };
@@ -296,30 +314,73 @@
     var banner = document.querySelector(".scroll-banner");
     var bannerHeight = banner ? banner.getBoundingClientRect().height : 0;
     var rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-    var TOP_SPACING_PX = Math.max(12 * rootFontSize, bannerHeight + 24);
+    var backButton = document.querySelector(".back-button");
+
+    // Where the top edge of a tall piece (and of the first item on every
+    // page) comes to rest: level with the bottom of the back button.
+    // Read off the button itself rather than hard-coded, so the two
+    // can't drift apart if its padding, border or glyph size ever
+    // changes — including when the web font swaps in and changes its
+    // height, which is why this is re-read rather than measured once.
+    // .back-button is position:fixed, so its rect is viewport-relative
+    // and unaffected by scroll position.
+    function computeTopSpacing() {
+      if (backButton) {
+        var rect = backButton.getBoundingClientRect();
+        if (rect.height) return Math.round(rect.bottom);
+      }
+      return Math.max(bannerHeight + 24, 6 * rootFontSize);
+    }
+    var TOP_SPACING_PX = computeTopSpacing();
     // How much taller than the viewport a piece needs to be before it's
     // worth splitting into two stops rather than sharing one screen
     // with its own caption — a little slack above 1.0 so items that
     // only barely exceed the viewport (and would fit fine with a
     // little focus falloff) aren't needlessly split.
     var TALL_RATIO = 1.15;
+    // Must stay in step with the scroll-margin-bottom on
+    // .gallery-item--tall's stage-two stop in category-page.css — the
+    // visible gap left under a tall piece when it rests at its lower
+    // stage, and the bottom padding the last project needs for that
+    // stop to exist within the page at all.
+    var STAGE_TWO_GAP_PX = 6 * rootFontSize;
 
     function applySnapAlignment() {
       var vh = window.innerHeight;
+      TOP_SPACING_PX = computeTopSpacing();
       entries.forEach(function (entry, index) {
         var isFirst = index === 0;
-        var isTall = entry.media.getBoundingClientRect().height > vh * TALL_RATIO;
+        // offsetHeight, not getBoundingClientRect: the focus effect
+        // scales the media by up to ~3.5%, which a rect measurement
+        // includes and layout does not. Snapping works off the layout
+        // box, so measuring the visual one both misjudges borderline
+        // items and quietly disagrees with where the browser will
+        // actually stop.
+        var isTall = entry.media.offsetHeight > vh * TALL_RATIO;
         entry.item.classList.toggle("gallery-item--tall", isTall);
 
-        if (isFirst) {
+        if (isFirst || isTall) {
+          // Both stop with their top edge a fixed distance below the
+          // banner — the same distance, every time. Tall pieces used to
+          // get scrollMarginTop 0 here, which parked each one hard
+          // against the banner and, because their heights differ, at a
+          // visibly different offset from one to the next. Sharing the
+          // first item's spacing is what makes every tall piece open
+          // identically.
           entry.item.style.scrollSnapAlign = "start";
           entry.item.style.scrollMarginTop = TOP_SPACING_PX + "px";
-        } else if (isTall) {
-          entry.item.style.scrollSnapAlign = "start";
-          entry.item.style.scrollMarginTop = "0px";
         } else {
+          // Short pieces have room to sit whole on screen, so they come
+          // to rest centred — but centred in the space actually
+          // available to look at, not in the raw viewport. The banner is
+          // fixed and paints over the top of the scrollport, so a
+          // geometrically perfect centre still leaves visibly less room
+          // above the artwork than below it. Padding the snap area's top
+          // edge by the banner's own height shifts the resting position
+          // down by exactly half of it, which is what evens the two gaps
+          // out. Pages without a banner get 0 here and are unaffected.
           entry.item.style.scrollSnapAlign = "center";
-          entry.item.style.scrollMarginTop = "0px";
+          entry.item.style.scrollMarginTop = bannerHeight + "px";
         }
       });
     }
@@ -340,16 +401,11 @@
       media.addEventListener(eventName, applySnapAlignment, { once: true });
     });
 
-    // The top edge is a fixed, page-independent constant (TOP_SPACING_PX
-    // — the same value applySnapAlignment uses as a tall first item's own
-    // snap target) so every project page's first image starts at exactly
-    // the same distance below the banner/back-button, regardless of that
-    // item's own height. On every project currently in the galleries
-    // this floor is already taller than a first item would ever need for
-    // centering on its own, so this doesn't reintroduce the old
-    // can't-quite-reach-center problem — but it does mean a *future*
-    // first item short enough to need more than TOP_SPACING_PX to center
-    // itself would take priority on consistency over perfect centering.
+    // The top edge is the same page-independent constant every tall
+    // piece snaps to (TOP_SPACING_PX — the back button's own bottom
+    // edge, see computeTopSpacing), so every project page's first image
+    // starts at exactly the same distance below the banner regardless of
+    // that item's own height.
     //
     // The bottom edge still tops up dynamically per page: unlike the
     // top, staying consistent across pages was never the ask there, and
@@ -360,13 +416,35 @@
       var grid = document.querySelector(".project-grid");
       if (!grid) return;
       var vh = window.innerHeight;
-      // The whole item now (image + caption), matching what's actually
-      // being centered — using just the media's height here would
-      // undershoot the buffer the caption itself also needs room for.
-      var lastHeight = entries[entries.length - 1].item.getBoundingClientRect().height;
-      var bottomNeeded = Math.max(0, (vh - lastHeight) / 2) + 24;
+      TOP_SPACING_PX = computeTopSpacing();
+      var lastItem = entries[entries.length - 1].item;
+      // Layout height, not the transform-scaled visual one — see the
+      // same note in applySnapAlignment.
+      var lastHeight = lastItem.offsetHeight;
+      var isTall = lastItem.classList.contains("gallery-item--tall");
+
+      // Room the last project needs below itself purely to be able to
+      // *reach* its own resting position — without it the page runs out
+      // of scroll first and the item settles short of its snap point.
+      // Which position that is depends on how it aligns (see
+      // applySnapAlignment): tall pieces stop with their top below the
+      // banner, short ones stop centred.
+      // For a tall last project that also has to be at least the
+      // stage-two gap (the scroll-margin-bottom on .gallery-item--tall's
+      // second stop in category-page.css): that stop sits that far past
+      // the artwork's own bottom edge, so without the matching padding
+      // here it falls outside the page's maximum scroll and simply
+      // can't be reached.
+      var reachNeeded = isTall
+        ? Math.max(STAGE_TWO_GAP_PX, vh - TOP_SPACING_PX - lastHeight)
+        : Math.max(0, (vh - lastHeight) / 2);
+
+      // …and on top of that, a deliberate margin so the final project
+      // has room to breathe rather than ending flush with the page.
+      var breathingRoom = Math.max(7 * rootFontSize, Math.round(vh * 0.16));
+
       grid.style.marginTop = TOP_SPACING_PX + "px";
-      grid.style.paddingBottom = "max(14rem, " + bottomNeeded + "px)";
+      grid.style.paddingBottom = Math.round(reachNeeded + breathingRoom) + "px";
     }
     applyEdgeSpacing();
     window.addEventListener("resize", applyEdgeSpacing);
@@ -450,7 +528,24 @@
       return t * t * (3 - 2 * t);
     }
 
-    var EASE = 0.19; // how quickly the applied values chase their target each frame
+    // How quickly the applied values chase their target, expressed as
+    // the fraction closed per frame *at 60fps*. The actual per-frame
+    // amount is re-derived from real elapsed time below (see easeAmount)
+    // so a 120Hz display doesn't converge twice as fast as a 60Hz one —
+    // which is exactly the kind of thing that makes the same motion feel
+    // snappy on one machine and sluggish on another. Eased down from
+    // 0.19: a longer tail is what reads as gliding rather than tracking.
+    var EASE = 0.12;
+
+    var lastFrameAt = performance.now();
+    var easeStep = EASE;
+    var slideEaseStep;
+
+    // Converts a per-frame-at-60fps easing figure into the equivalent
+    // fraction for however long this frame actually took.
+    function easeAmount(perFrameAt60, dtSeconds) {
+      return 1 - Math.pow(1 - perFrameAt60, dtSeconds * 60);
+    }
     // Shrinks the falloff zone so an item reaches full focus well before it
     // reaches dead-center — with scroll-snap now locking each section to
     // center, the goal is for the project to already read as sharp/focused
@@ -463,8 +558,136 @@
     // room to read the caption and reach the button, rather than still
     // scaled up and glowing underneath them.
     var EXIT_RELEASE_PX = 420;
+    // How far an open project's image slides left in reveal mode (see
+    // REVEAL_MODE) to make room for its text panel.
+    var SLIDE_PX = 120;
+    // A slower, distinct ease from EASE above — the slide is meant to
+    // read as a deliberate, gliding motion rather than the snappier
+    // catch-up used for the scroll-driven scale/blur/shadow.
+    var SLIDE_EASE = 0.085;
+    // How long to wait after focus moves to a new project before
+    // swapping content and fading the new button in. Must be at least
+    // the button's own fade-out duration (0.34s — see the transition on
+    // .gallery-caption--floating in category-page.css); anything
+    // shorter starts the arrival while the exit is still mid-flight,
+    // which is what made the swap read as a jump rather than a
+    // hand-off.
+    var REVEAL_SWAP_MS = 360;
+
+    // Branding's single floating "+"/"×" button and text panel (see
+    // REVEAL_MODE): rather than living inside each project like the
+    // other pages' per-item pill, both are single shared elements
+    // repositioned to sit right at the current project's own right
+    // edge (see updateFloatingHorizontal) and swapped — with a brief
+    // fade out/in, so each project visibly reads as having its own
+    // button and panel — as focus moves between projects. Opening one
+    // always starts fresh/closed for whichever project is now active;
+    // open/closed itself is otherwise untouched by scrolling — only
+    // clicking the button changes it, matching "closes only by
+    // clicking."
+    var floatingBtn = REVEAL_MODE ? document.querySelector(".gallery-caption--floating") : null;
+    var floatingPanel = REVEAL_MODE ? document.querySelector(".gallery-textpanel--floating") : null;
+    var floatingPanelTitle = floatingPanel ? floatingPanel.querySelector(".gallery-textpanel-title") : null;
+    var floatingPanelText = floatingPanel ? floatingPanel.querySelector(".gallery-subtitle") : null;
+    var activeEntry = null;
+    var panelOpen = false;
+    var revealToken = 0;
+
+    // The button/panel hug whichever project is active horizontally —
+    // computed from the grid's own edge (constant across every project,
+    // since they all share the same centered column) rather than a
+    // flat viewport margin, so they always sit right at the image's own
+    // edge instead of drifting off into empty page margin on wide
+    // screens. The button itself rests well *outside* that edge while
+    // closed — clearly its own control, not overlapping the artwork —
+    // and glides inward when it opens, nesting *inside* the panel's own
+    // edge with a small margin of its own (not flush against it) so it
+    // reads as properly framed rather than hanging off the corner (see
+    // the `right` transition on .gallery-caption--floating in
+    // category-page.css). A negative PANEL_DOCK_INSET means the panel
+    // overhangs the image's right edge rather than tucking inside it.
+    var BUTTON_OUTSIDE_GAP = 84;
+    var PANEL_DOCK_INSET = -24;
+    var BUTTON_DOCK_MARGIN = 14;
+
+    function updateFloatingHorizontal() {
+      if (!floatingBtn && !floatingPanel) return;
+      var media = document.querySelector(".gallery-media");
+      if (!media) return;
+      var edgeGap = window.innerWidth - media.getBoundingClientRect().right;
+      var dockedInset = Math.max(0, edgeGap + PANEL_DOCK_INSET);
+      if (floatingPanel) floatingPanel.style.right = dockedInset + "px";
+      if (floatingBtn) {
+        var btnWidth = floatingBtn.getBoundingClientRect().width || 40;
+        // Floor at a small viewport margin, not 0: on narrow screens the
+        // page margin is thinner than BUTTON_OUTSIDE_GAP, and without
+        // this the button would end up flush against the screen edge.
+        var outsideInset = Math.max(12, edgeGap - BUTTON_OUTSIDE_GAP - btnWidth);
+        var dockedBtnInset = dockedInset + BUTTON_DOCK_MARGIN;
+        floatingBtn.style.right = (panelOpen ? dockedBtnInset : outsideInset) + "px";
+      }
+    }
+    if (REVEAL_MODE) {
+      updateFloatingHorizontal();
+      window.addEventListener("resize", updateFloatingHorizontal);
+    }
+
+    function updateFloatingLabel() {
+      if (!floatingBtn) return;
+      var label = activeEntry && activeEntry.label ? activeEntry.label : "";
+      floatingBtn.setAttribute(
+        "aria-label",
+        label ? label + (panelOpen ? " — fechar" : " — ver projeto") : "Ver projeto"
+      );
+    }
+
+    function setActiveEntry(nextEntry) {
+      if (nextEntry === activeEntry) return;
+      var hadPrevious = !!activeEntry;
+      revealToken++;
+      var myToken = revealToken;
+
+      // Fade the current project's button/panel out (and reset open —
+      // each project starts fresh) immediately; the *next* one only
+      // fades in once that's had time to finish, so the two never
+      // cross-fade into a confusing double-visible state.
+      if (floatingBtn) floatingBtn.classList.remove("is-visible", "is-open");
+      if (floatingPanel) floatingPanel.classList.remove("is-open");
+      panelOpen = false;
+      activeEntry = nextEntry;
+
+      window.setTimeout(function () {
+        if (myToken !== revealToken) return; // superseded by a later scroll
+        if (activeEntry) {
+          if (floatingPanelTitle) floatingPanelTitle.textContent = activeEntry.label || "";
+          if (floatingPanelText) floatingPanelText.textContent = activeEntry.description || "";
+          updateFloatingHorizontal();
+        }
+        if (floatingBtn) floatingBtn.classList.toggle("is-visible", !!activeEntry);
+        updateFloatingLabel();
+      }, hadPrevious ? REVEAL_SWAP_MS : 0);
+    }
+
+    if (floatingBtn) {
+      floatingBtn.addEventListener("click", function () {
+        if (!activeEntry) return;
+        panelOpen = !panelOpen;
+        floatingBtn.classList.toggle("is-open", panelOpen);
+        if (floatingPanel) floatingPanel.classList.toggle("is-open", panelOpen);
+        updateFloatingLabel();
+        updateFloatingHorizontal(); // glide the button between its outside rest spot and the panel's edge
+      });
+    }
 
     function tick() {
+      var frameNow = performance.now();
+      // Clamped so a backgrounded tab returning after seconds away
+      // doesn't resolve everything in a single jarring frame.
+      var dt = Math.min((frameNow - lastFrameAt) / 1000, 0.05);
+      lastFrameAt = frameNow;
+      easeStep = easeAmount(EASE, dt);
+      slideEaseStep = easeAmount(SLIDE_EASE, dt);
+
       if (galleryPaused) {
         requestAnimationFrame(tick);
         return;
@@ -472,6 +695,8 @@
 
       var vh = window.innerHeight;
       var vCenter = vh / 2;
+      var bestEntry = null;
+      var bestFocus = -1;
 
       entries.forEach(function (entry) {
         var rect = entry.media.getBoundingClientRect();
@@ -505,19 +730,41 @@
           yTarget = dist * -18;
         }
 
+        if (focus > bestFocus) {
+          bestFocus = focus;
+          bestEntry = entry;
+        }
+
+        // Reveal-mode's slide-left-on-open, folded into the same
+        // per-frame lerp as everything else here so it never fights the
+        // JS-driven scale/blur transform for control of `transform`
+        // (see --gf-slide-x in category-page.css). Only the currently
+        // active project slides — as focus moves on, this eases back to
+        // 0 on its own, and whichever project becomes active next picks
+        // up the slide if the panel is still open.
+        var slideTarget = (REVEAL_MODE && panelOpen && entry === activeEntry) ? -SLIDE_PX : 0;
+
+        // Softer extremes than before (scale 0.96→1.06, opacity 0.6→1,
+        // blur 2.5px): those ranges made an out-of-focus project read as
+        // dimmed-out rather than simply further away, and the swing
+        // between the two was doing most of the work of making scrolling
+        // feel busy. Pulling them in leaves the same depth cue with far
+        // less visual noise.
         var cur = entry.cur;
-        cur.scale = lerp(cur.scale, lerp(0.96, 1.06, focus), EASE);
-        cur.y = lerp(cur.y, yTarget, EASE);
-        cur.opacity = lerp(cur.opacity, lerp(0.6, 1, focus), EASE);
-        cur.brightness = lerp(cur.brightness, lerp(0.93, 1.04, focus), EASE);
-        cur.contrast = lerp(cur.contrast, lerp(0.95, 1.06, focus), EASE);
-        cur.blur = lerp(cur.blur, lerp(2.5, 0, focus), EASE);
-        cur.shadowBlur = lerp(cur.shadowBlur, lerp(12, 34, focus), EASE);
-        cur.shadowAlpha = lerp(cur.shadowAlpha, lerp(0.06, 0.2, focus), EASE);
+        cur.scale = lerp(cur.scale, lerp(0.975, 1.035, focus), easeStep);
+        cur.y = lerp(cur.y, yTarget, easeStep);
+        cur.slideX = lerp(cur.slideX, slideTarget, slideEaseStep);
+        cur.opacity = lerp(cur.opacity, lerp(0.78, 1, focus), easeStep);
+        cur.brightness = lerp(cur.brightness, lerp(0.96, 1.02, focus), easeStep);
+        cur.contrast = lerp(cur.contrast, lerp(0.97, 1.03, focus), easeStep);
+        cur.blur = lerp(cur.blur, lerp(1.6, 0, focus), easeStep);
+        cur.shadowBlur = lerp(cur.shadowBlur, lerp(14, 30, focus), easeStep);
+        cur.shadowAlpha = lerp(cur.shadowAlpha, lerp(0.07, 0.17, focus), easeStep);
 
         var style = entry.media.style;
         style.setProperty("--gf-scale", cur.scale.toFixed(4));
         style.setProperty("--gf-y", cur.y.toFixed(2) + "px");
+        style.setProperty("--gf-slide-x", cur.slideX.toFixed(2) + "px");
         style.setProperty("--gf-opacity", cur.opacity.toFixed(3));
         style.setProperty("--gf-brightness", cur.brightness.toFixed(3));
         style.setProperty("--gf-contrast", cur.contrast.toFixed(3));
@@ -525,6 +772,12 @@
         style.setProperty("--gf-shadow-blur", cur.shadowBlur.toFixed(1) + "px");
         style.setProperty("--gf-shadow-alpha", cur.shadowAlpha.toFixed(3));
       });
+
+      // A momentarily-null bestEntry (e.g. a frame caught mid-reflow,
+      // before any rect has a sane height yet) must never itself count
+      // as "focus moved elsewhere" — that would silently close whatever
+      // was open. Only a real, positively-focused entry can take over.
+      if (floatingBtn && bestEntry) setActiveEntry(bestEntry);
 
       requestAnimationFrame(tick);
     }
@@ -535,9 +788,14 @@
   document.addEventListener("DOMContentLoaded", function () {
     wireToggle(document.querySelector(".cta-button"), document.querySelector(".cta-wrap"));
 
-    document.querySelectorAll(".gallery-item").forEach(function (item) {
-      wireToggle(item.querySelector(".gallery-caption"), item);
-    });
+    // Branding's single floating button (wired inside wireScrollFocus,
+    // where the per-frame focus tracking already lives) replaces the
+    // per-item pill entirely — nothing to wire here for it.
+    if (!REVEAL_MODE) {
+      document.querySelectorAll(".gallery-item").forEach(function (item) {
+        wireToggle(item.querySelector(".gallery-caption"), item);
+      });
+    }
 
     wireVideoAutoplay();
     wireGalleryFrames();

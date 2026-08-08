@@ -66,15 +66,29 @@ html, body {
   min-height: 100vh;
 }
 
-/* Each gallery item is its own section: scrolling locks onto whichever one
-   is nearest rather than drifting to rest between two, and a fast flick
-   still stops at the very next item instead of skipping past it (stop:
-   always). Lives on html since that's the actual scrolling box here (body
-   has no overflow of its own) — center align matches wireScrollFocus's own
-   idea of "in focus" (item centered in the viewport), so the resting state
-   after a snap is always the fully-focused one. */
+/* Each gallery item is its own section, so scrolling settles onto one
+   rather than drifting to rest between two. `mandatory` rather than
+   `proximity` because proximity only pulls you in if you happened to
+   stop close enough — end a gesture a bit short and a project just sits
+   off-centre, which is precisely the "not properly centred" problem.
+   What actually made snapping feel aggressive was `scroll-snap-stop:
+   always` on every item: that halts momentum dead at each one, so
+   crossing several projects took several separate gestures. That's now
+   reserved for tall pieces alone (see .gallery-item--tall below), where
+   being carried past the top of the artwork is a real loss. Short
+   projects keep free-flowing momentum and simply always land centred.
+   Lives on html since that's the actual scrolling box here (body has no
+   overflow of its own). */
 html {
   scroll-snap-type: y mandatory;
+  /* Makes the browser *animate* its snap correction instead of applying
+     it as an immediate jump. It matters most on the tall pieces, where
+     the step between the top framing and the lower one is several
+     hundred pixels — long enough that landing it instantly gives no
+     chance to actually follow the artwork past. Programmatic scrolls in
+     category-page.js all pass their own explicit `behavior`, so none of
+     them are affected by this. */
+  scroll-behavior: smooth;
 }
 
 /* While a project's info panel is open (see wireToggle in
@@ -89,6 +103,7 @@ html.gallery-reading-mode {
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-snap-type: none;
+    scroll-behavior: auto;
   }
 }
 
@@ -175,17 +190,14 @@ body {
 
 .project-grid {
   max-width: 1000px;
-  /* Generous top/bottom margin so the gallery reads as its own space
-     below the banner/back-button (and above the page's own end), not
-     butted right up against them — this is the base spacing for the
-     no-JS/reduced-motion static gallery (no scroll-snap in that case, so
-     this is plenty). With scroll-snap active, category-page.js tops
-     both of these up per page to whatever the first/last item's own
-     height actually needs (see applyEdgeSpacing) — and, for a tall
-     first item, also sets its scroll-snap target to this same 12rem so
-     the snap point doesn't pull it in tighter than this margin already
-     gives it (see applySnapAlignment's TOP_SPACING_PX). */
-  margin: 12rem auto 0;
+  /* Top margin clears the banner and back button; bottom keeps the
+     gallery off the end of the page. These are the no-JS/reduced-motion
+     fallbacks — with scroll-snap active, category-page.js replaces both
+     (see applyEdgeSpacing) with the back button's own bottom edge on
+     top, and whatever the last item needs on the bottom. 7.75rem matches
+     that measured top edge closely enough that the static rendering
+     doesn't visibly differ. */
+  margin: 7.75rem auto 0;
   padding: 0 2rem 14rem;
 }
 
@@ -216,15 +228,13 @@ body {
 
 .gallery-item {
   width: 100%;
-  /* The actual "how long does this project stay on screen" control:
-     scroll-snap-stop below guarantees a scroll gesture can't skip past
-     an item, but with a small gap the *distance* between one item's
-     snap point and the next was short enough that a couple of ticks
-     covered it — reading as the gallery rushing to the next project.
-     A more generous gap means genuinely more scrolling (not waiting)
-     is needed to get there, which is what actually slows the felt
-     pace down without touching any timing. */
-  margin-bottom: 13rem;
+  /* The actual "how long does this project stay on screen" control —
+     genuine scroll distance between one project and the next, rather
+     than any timing trick. Scaled to the viewport instead of a flat
+     13rem: on a short window that fixed gap was most of a screen of
+     dead space between projects, and on a tall one it barely
+     registered. The clamp keeps it sane at both extremes. */
+  margin-bottom: clamp(7rem, 16vh, 11rem);
   text-align: center;
   /* Centers the *whole* item — image and caption/button together, as
      one section — not just the image with the caption excluded (see
@@ -238,7 +248,6 @@ body {
      applySnapAlignment) and for tall portrait pieces (see
      .gallery-item--tall below, a second stop rather than one section). */
   scroll-snap-align: center;
-  scroll-snap-stop: always;
 }
 
 .gallery-item:last-child {
@@ -263,9 +272,26 @@ body {
    deliberate stages rather than needing to fit whole or scrolling
    through it freely. Short/normal work never gets this class and is
    unaffected. */
-.gallery-item--tall figcaption {
+/* Stage one: forced stop, so a fast gesture can never carry the reader
+   straight past the top of a tall piece and dump them at its bottom
+   edge with the artwork already half gone. This is the only place
+   scroll-snap-stop is used — short projects keep free momentum. */
+.gallery-item--tall {
+  scroll-snap-stop: always;
+}
+
+/* Stage two: the lower part of the artwork. scroll-margin-bottom is
+   what keeps this from resting with the image jammed flush against the
+   bottom of the screen — it pushes the snap area past the real edge, so
+   aligning it to the viewport bottom leaves that much visible gap under
+   the image instead. Without it the final project's stage two also
+   lands beyond the page's own maximum scroll and can't be reached at
+   all, which is what made the end of the page snap upward and clip it. */
+.gallery-item--tall figcaption,
+body.project-reveal .gallery-item--tall .gallery-media {
   scroll-snap-align: end;
   scroll-snap-stop: always;
+  scroll-margin-bottom: 6rem;
 }
 
 /* Scroll-driven focus effect (see wireScrollFocus in category-page.js):
@@ -283,9 +309,12 @@ body {
    not a broken one. */
 .gallery-item > img,
 .gallery-item > .gallery-video,
-.gallery-item > .gallery-frame-wrap {
+.gallery-item > .gallery-frame-wrap,
+.gallery-item > .gallery-media > img,
+.gallery-item > .gallery-media > .gallery-video {
   --gf-scale: 1;
   --gf-y: 0px;
+  --gf-slide-x: 0px;
   --gf-opacity: 1;
   --gf-brightness: 1;
   --gf-contrast: 1;
@@ -293,7 +322,12 @@ body {
   --gf-shadow-blur: 16px;
   --gf-shadow-alpha: 0.1;
 
-  transform: translateY(var(--gf-y)) scale(var(--gf-scale));
+  /* --gf-slide-x is only ever non-zero in branding's reveal mode (see
+     REVEAL_MODE in category-page.js) — folding it into the same
+     JS-driven transform, instead of a separate CSS-transitioned rule,
+     avoids the two fighting over the same `transform` property every
+     frame. */
+  transform: translateY(var(--gf-y)) translateX(var(--gf-slide-x)) scale(var(--gf-scale));
   opacity: var(--gf-opacity);
   filter: brightness(var(--gf-brightness)) contrast(var(--gf-contrast)) blur(var(--gf-blur));
   box-shadow: 0 18px var(--gf-shadow-blur) rgba(0, 0, 0, var(--gf-shadow-alpha));
@@ -303,7 +337,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .gallery-item > img,
   .gallery-item > .gallery-video,
-  .gallery-item > .gallery-frame-wrap {
+  .gallery-item > .gallery-frame-wrap,
+  .gallery-item > .gallery-media > img,
+  .gallery-item > .gallery-media > .gallery-video {
     transform: none;
     opacity: 1;
     filter: none;
@@ -413,7 +449,8 @@ body {
   background: transparent;
   cursor: pointer;
   transition: border-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-              background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+              background-color 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+              opacity 0.4s ease, transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .gallery-icon {
@@ -467,6 +504,200 @@ body {
   max-height: min(45vh, 26rem);
   overflow-y: auto;
   margin-top: 0.5rem;
+}
+
+/* Branding-only "reveal" interaction (see body.project-reveal in
+   branding.html and REVEAL_MODE in category-page.js): a single
+   floating "+"/"×" button and a single floating text panel (see
+   .gallery-caption--floating / .gallery-textpanel--floating below)
+   both sit fixed to the viewport and simply re-target themselves to
+   whichever project currently has focus, rather than living inside
+   each project like the other pages' per-item pill + inline subtitle.
+   That's also why the panel is one shared, fixed-position element
+   instead of one per project: a tall piece's own box can run well
+   over 1000px, so a panel anchored *inside* it could end up centered
+   hundreds of pixels outside whatever's actually on screen, or get
+   left stranded on screen after scrolling past the project it was
+   opened for. Opening it slides the active project's image left (via
+   --gf-slide-x, driven by wireScrollFocus's own tick loop so it never
+   fights the JS-driven scale/blur transform for control of
+   `transform`). Social/Web Design keep the original per-item pill +
+   inline subtitle untouched. */
+body.project-reveal .gallery-media {
+  position: relative;
+}
+
+/* (Reveal-mode tall pieces get their stage-two snap stop from the
+   shared .gallery-item--tall rule further up, which already targets
+   .gallery-media alongside the other pages' figcaption.) */
+
+/* Frosted-glass card — legible over busy artwork without needing a
+   flat, opaque block, and reads as a distinct, considered surface
+   rather than a plain gray box. Grows outward from the button's own
+   anchor point (transform-origin: right center, same fixed `right` as
+   the button — see updateFloatingHorizontal in category-page.js) so
+   opening it feels like the button expanding into the card rather
+   than two unrelated elements independently fading in. */
+.gallery-textpanel--floating {
+  position: fixed;
+  /* Half the banner's own 4rem height below centre — the same optical
+     correction applied to where short projects come to rest (see
+     applySnapAlignment in category-page.js). Without it this would sit
+     centred on the raw viewport while the artwork sits centred on the
+     part of it you can actually see, and the two would disagree. */
+  top: calc(50% + 2rem);
+  right: 2.5rem;
+  width: min(60%, 26rem);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 2.25rem 2.5rem;
+  text-align: left;
+  /* Deliberately sheer — the artwork stays readable through the card.
+     The heavier blur/saturation is what buys that transparency back in
+     legibility: it softens whatever's behind into a wash of colour
+     rather than competing detail. */
+  background: rgba(253, 253, 252, 0.6);
+  backdrop-filter: blur(42px) saturate(200%);
+  -webkit-backdrop-filter: blur(42px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 1.4rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04), 0 30px 60px -12px rgba(0, 0, 0, 0.18);
+  opacity: 0;
+  transform-origin: right center;
+  transform: translateY(-50%) scale(0.7);
+  pointer-events: none;
+  z-index: 11;
+  transition: opacity 0.5s cubic-bezier(0.19, 1, 0.22, 1),
+              transform 0.55s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+.gallery-textpanel--floating.is-open {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+  pointer-events: auto;
+}
+
+.gallery-textpanel-title {
+  font-family: "Ouma Devanagari", sans-serif;
+  font-weight: 400;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #1a1a1a;
+}
+
+/* The panel's own opacity/transform above is what shows and hides the
+   text now, so the subtitle itself skips its usual closed-by-default
+   animation (see .gallery-subtitle / .gallery-item.is-open
+   .gallery-subtitle) and just renders at rest inside the panel. */
+.gallery-textpanel--floating .gallery-subtitle {
+  max-width: none;
+  max-height: min(55vh, 28rem);
+  margin-top: 0;
+  opacity: 1;
+  transform: none;
+  overflow-y: auto;
+  /* A little darker than the default muted grey — the sheerer card
+     above lets more of the artwork through, so the text needs the
+     extra weight to hold up against it. */
+  color: rgba(26, 26, 26, 0.78);
+}
+
+/* Single floating button (see wireScrollFocus in category-page.js) —
+   fixed to the viewport, sharing the exact same `right` offset as the
+   panel (both computed off the current project's own right edge, not
+   a flat viewport margin — see updateFloatingHorizontal), so the two
+   sit concentric on each other: the button rests right at the panel's
+   own edge rather than floating apart from it. Fades out and back in
+   as focus moves to a different project (see setActiveEntry) — each
+   project reads as having its own button, not one that just silently
+   relabels. Once open, it borrows the panel's own glass surface
+   instead of keeping its plain pill background, so it reads as the
+   panel's built-in close control rather than a separate circle
+   sitting on top of it. */
+.gallery-caption--floating {
+  position: fixed;
+  top: calc(50% + 2rem); /* matches the panel's banner offset above */
+  right: 2.5rem;
+  z-index: 13;
+  margin-top: 0;
+  opacity: 0;
+  /* Resting hidden state is scaled down and nudged outward, so arriving
+     reads as easing into place rather than a bare opacity flip — the
+     part that made the swap between projects feel like a jump. */
+  transform: translateY(-50%) translateX(8px) scale(0.78);
+  pointer-events: none;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  /* This rule is the *leaving* state, so its timing is the fade-out:
+     shorter and gently accelerating, versus the long expo settle on
+     .is-visible below. setActiveEntry in category-page.js waits out
+     this exit (REVEAL_SWAP_MS) before bringing the next project's
+     button back, so the two never overlap mid-fade.
+     `right` glides the button between its resting spot outside the
+     image edge (closed) and its docked spot inside the panel (open) —
+     see updateFloatingHorizontal in category-page.js — timed to match
+     the panel's own grow transition so the two arrive together. */
+  transition: opacity 0.34s cubic-bezier(0.4, 0, 0.7, 1),
+              transform 0.34s cubic-bezier(0.4, 0, 0.7, 1),
+              right 0.65s cubic-bezier(0.19, 1, 0.22, 1),
+              box-shadow 0.45s ease,
+              background-color 0.5s ease, border-color 0.5s ease;
+}
+
+.gallery-caption--floating.is-visible {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0) scale(1);
+  pointer-events: auto;
+  /* Arriving is slower and expo-eased — it decelerates into place
+     instead of stopping dead. */
+  transition: opacity 0.68s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.68s cubic-bezier(0.16, 1, 0.3, 1),
+              right 0.65s cubic-bezier(0.19, 1, 0.22, 1),
+              box-shadow 0.45s ease,
+              background-color 0.5s ease, border-color 0.5s ease;
+}
+
+.gallery-caption--floating.is-visible:hover,
+.gallery-caption--floating.is-visible:focus-visible {
+  transform: translateY(-50%) translateX(0) scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.11);
+}
+
+.gallery-caption--floating.is-visible:active {
+  transform: translateY(-50%) translateX(0) scale(0.96);
+}
+
+/* Docked inside the panel: takes on the same sheer glass surface so it
+   reads as the card's own close control rather than a separate pill
+   sitting on top of it — a touch lighter than the panel itself so it
+   still stands out against it. */
+.gallery-caption--floating.is-open {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-color: rgba(26, 26, 26, 0.14);
+}
+
+/* A longer, expo-eased glyph turn than the per-item pills on the other
+   pages — scoped to the floating button so those stay untouched. */
+.gallery-caption--floating .gallery-icon {
+  transition: font-weight 0.25s ease,
+              transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+@media (max-width: 700px) {
+  .gallery-textpanel--floating {
+    right: 1.25rem;
+    width: min(78%, 22rem);
+    padding: 1.5rem 1.75rem;
+  }
+
+  .gallery-caption--floating {
+    right: 1.25rem;
+  }
 }
 
 .project-cta {
