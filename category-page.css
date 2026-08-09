@@ -100,6 +100,16 @@ html.gallery-reading-mode {
   scroll-snap-type: none;
 }
 
+/* While the next category is being dragged in (see page-transition.js),
+   the page underneath must hold absolutely still: mandatory snap would
+   otherwise keep resolving against a gallery the reader has already
+   scrolled past the end of, and smooth scrolling would animate against
+   a gesture that is already driving the layer directly. */
+html.pt-transitioning {
+  scroll-snap-type: none;
+  scroll-behavior: auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-snap-type: none;
@@ -736,6 +746,90 @@ body {
   body.project-reveal .back-button {
     display: none;
   }
+}
+
+/* ---------------------------------------------------------------------
+   Scroll-linked navigation between categories (see page-transition.js).
+
+   Two layers: .pt-shell holds whatever the current page draws, and
+   .pt-layer holds the page being dragged in. The shell is deliberately
+   styleless at rest — no transform, no filter, nothing — because a
+   transformed ancestor becomes the containing block for position:fixed
+   descendants, which would move the banner, the back button and the
+   floating panel out from under their own CSS. JS sets those properties
+   only while a transition is actually running, and removes them
+   outright afterwards.
+   --------------------------------------------------------------------- */
+
+.pt-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  overflow: hidden;
+  display: none;
+  background: #ececee;
+  /* transform-driven, so it never triggers layout while being dragged */
+  will-change: transform;
+  transform: translate3d(0, 100%, 0);
+}
+
+.pt-layer.is-active {
+  display: block;
+}
+
+/* The leading edge carries a soft shadow so the incoming page reads as
+   sitting above the one it's covering rather than butted against it —
+   the single cue that most sells one surface passing over another. It
+   fades up with the drag so it isn't a hard line at first contact. */
+.pt-layer.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 120px;
+  pointer-events: none;
+  opacity: calc(var(--pt-progress, 0) * 0.85);
+}
+
+.pt-layer.from-below::before {
+  top: -120px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0));
+}
+
+.pt-layer.from-above::before {
+  bottom: -120px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0));
+}
+
+.pt-layer-inner {
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+}
+
+/* Home is previewed rather than injected — it has its own stylesheet
+   that restyles body wholesale. This borrows its warm charcoal so the
+   edge that appears belongs unmistakably to that page. */
+.pt-home-preview {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #17140f;
+}
+
+.pt-home-label {
+  font-family: "Ouma Devanagari", sans-serif;
+  font-weight: 400;
+  font-size: clamp(1.6rem, 5vw, 3rem);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.92);
+  /* Drifts up into place as the layer arrives, a touch behind it, so
+     the type settles rather than riding along rigidly. */
+  transform: translateY(calc((1 - var(--pt-progress, 0)) * 26px));
+  opacity: calc(var(--pt-progress, 0) * 1.4);
 }
 
 .project-cta {

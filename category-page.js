@@ -34,6 +34,42 @@
     resume: function () {}
   };
 
+  // Everything below assumed it ran exactly once, against markup that
+  // then stayed put. page-transition.js breaks that assumption: it
+  // swaps one category's markup for the next without a page load, and
+  // has to re-run this afterwards against the new DOM. So every
+  // listener, observer and animation loop registers how to undo itself,
+  // and initCategoryPage() tears the previous run down before starting
+  // a new one — otherwise each transition would leave another rAF loop
+  // and another set of resize handlers running over dead nodes.
+  var cleanups = [];
+
+  function onCleanup(fn) {
+    cleanups.push(fn);
+  }
+
+  function listen(target, type, handler, options) {
+    target.addEventListener(type, handler, options);
+    onCleanup(function () {
+      target.removeEventListener(type, handler, options);
+    });
+  }
+
+  function runCleanups() {
+    while (cleanups.length) {
+      try { cleanups.pop()(); } catch (e) { /* a dead node is not worth failing over */ }
+    }
+  }
+
+  // Bumped on every teardown; the focus loop checks it each frame and
+  // simply stops rather than animating a gallery that no longer exists.
+  var loopToken = 0;
+
+  // Set by initCategoryPage: where this run should settle, and whether
+  // it was reached by a soft swap rather than a real page load.
+  var pendingLanding = "top";
+  var softSwap = false;
+
   // How long the caption/subtitle's own CSS transition (see
   // .gallery-subtitle / .cta-subtitle in category-page.css — opacity/
   // transform/max-height, up to a 0.15s delay + 0.5s duration) takes to
@@ -97,8 +133,13 @@
   // matchMedia's listener API was renamed; older Safari only has the
   // deprecated form.
   function onRevealBreakpointChange(handler) {
-    if (revealQuery.addEventListener) revealQuery.addEventListener("change", handler);
-    else if (revealQuery.addListener) revealQuery.addListener(handler);
+    if (revealQuery.addEventListener) {
+      revealQuery.addEventListener("change", handler);
+      onCleanup(function () { revealQuery.removeEventListener("change", handler); });
+    } else if (revealQuery.addListener) {
+      revealQuery.addListener(handler);
+      onCleanup(function () { revealQuery.removeListener(handler); });
+    }
   }
 
   function wireToggle(button, wrap) {
@@ -226,6 +267,7 @@
     videos.forEach(function (video) {
       observer.observe(video);
     });
+    onCleanup(function () { observer.disconnect(); });
   }
 
   function wireGalleryFrames() {
@@ -281,7 +323,7 @@
     var startY = 0;
     var tracking = false;
 
-    document.addEventListener("touchstart", function (e) {
+    listen(document, "touchstart", function (e) {
       // Single finger only — a pinch or two-finger gesture isn't a swipe.
       tracking = e.touches.length === 1 &&
         window.getComputedStyle(link).display === "none";
@@ -290,11 +332,11 @@
       startY = e.touches[0].clientY;
     }, { passive: true });
 
-    document.addEventListener("touchcancel", function () {
+    listen(document, "touchcancel", function () {
       tracking = false;
     }, { passive: true });
 
-    document.addEventListener("touchend", function (e) {
+    listen(document, "touchend", function (e) {
       if (!tracking) return;
       tracking = false;
       var touch = e.changedTouches && e.changedTouches[0];
@@ -470,7 +512,7 @@
       });
     }
     applySnapAlignment();
-    window.addEventListener("resize", applySnapAlignment);
+    listen(window, "resize", applySnapAlignment);
 
     // Lazy images/videos (most of them) report 0 height until loaded,
     // which would misclassify a genuinely tall piece as short. Nothing
@@ -532,7 +574,7 @@
       grid.style.paddingBottom = Math.round(reachNeeded + breathingRoom) + "px";
     }
     applyEdgeSpacing();
-    window.addEventListener("resize", applyEdgeSpacing);
+    listen(window, "resize", applyEdgeSpacing);
 
     // The last item's own height feeds directly into the bottom buffer
     // above — if it's a lazy-loaded image (most are), it still reports
@@ -565,7 +607,17 @@
     // a bfcache-restored page (native back/forward) doesn't re-run
     // scripts at all, so a real preserved scroll position is never here
     // to clobber.
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    // Where this run should come to rest. Normally the top; a scroll-up
+    // transition into the previous category lands at its bottom instead,
+    // which is where the reader physically left off (see
+    // page-transition.js).
+    window.scrollTo({
+      top: pendingLanding === "bottom"
+        ? document.documentElement.scrollHeight - window.innerHeight
+        : 0,
+      left: 0,
+      behavior: "instant"
+    });
 
     // On some pages that forced reset still isn't the final word: the
     // browser can re-resolve mandatory snap a second time shortly after
@@ -578,26 +630,32 @@
     // has actually touched the page is that browser-driven correction,
     // not a real one, and gets undone once. A genuine user scroll
     // (flagged the moment any input starts) is never touched.
-    var userInteracted = false;
-    ["pointerdown", "wheel", "touchstart", "keydown"].forEach(function (type) {
-      window.addEventListener(type, function () { userInteracted = true; }, { once: true, passive: true });
-    });
-    var loadStamp = performance.now();
-    var undidAutoScroll = false;
-    window.addEventListener("scroll", function onEarlyAutoScroll() {
-      if (undidAutoScroll || userInteracted) {
+    //
+    // Skipped entirely after a soft swap: that quirk belongs to parsing
+    // a fresh document, and here the watcher would instead fight the
+    // deliberate landing position the transition just set.
+    if (!softSwap) {
+      var userInteracted = false;
+      ["pointerdown", "wheel", "touchstart", "keydown"].forEach(function (type) {
+        listen(window, type, function () { userInteracted = true; }, { once: true, passive: true });
+      });
+      var loadStamp = performance.now();
+      var undidAutoScroll = false;
+      window.addEventListener("scroll", function onEarlyAutoScroll() {
+        if (undidAutoScroll || userInteracted) {
+          window.removeEventListener("scroll", onEarlyAutoScroll);
+          return;
+        }
+        if (performance.now() - loadStamp > 1000) {
+          window.removeEventListener("scroll", onEarlyAutoScroll);
+          return;
+        }
+        if (window.scrollY === 0) return; // nothing to undo yet
+        undidAutoScroll = true;
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" });
         window.removeEventListener("scroll", onEarlyAutoScroll);
-        return;
-      }
-      if (performance.now() - loadStamp > 1000) {
-        window.removeEventListener("scroll", onEarlyAutoScroll);
-        return;
-      }
-      if (window.scrollY === 0) return; // nothing to undo yet
-      undidAutoScroll = true;
-      window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-      window.removeEventListener("scroll", onEarlyAutoScroll);
-    }, { passive: true });
+      }, { passive: true });
+    }
 
     function clamp(value, min, max) {
       return Math.max(min, Math.min(max, value));
@@ -713,7 +771,7 @@
     }
     if (REVEAL_PAGE) {
       updateFloatingHorizontal();
-      window.addEventListener("resize", updateFloatingHorizontal);
+      listen(window, "resize", updateFloatingHorizontal);
     }
 
     function updateFloatingLabel() {
@@ -777,7 +835,14 @@
       });
     }
 
+    // Claim the loop: any frame still queued from a previous run of
+    // this function (i.e. from the markup that has since been swapped
+    // out) sees a stale token on its next tick and stops there.
+    var myLoopToken = ++loopToken;
+    onCleanup(function () { loopToken++; });
+
     function tick() {
+      if (myLoopToken !== loopToken) return;
       var frameNow = performance.now();
       // Clamped so a backgrounded tab returning after seconds away
       // doesn't resolve everything in a single jarring frame.
@@ -897,7 +962,19 @@
     requestAnimationFrame(tick);
   }
 
-  document.addEventListener("DOMContentLoaded", function () {
+  function initCategoryPage(options) {
+    // Undo whatever the previous run of this left behind. On a normal
+    // page load there is nothing to undo; after page-transition.js swaps
+    // in a new category's markup, this is what stops the outgoing one's
+    // loop and listeners from living on.
+    runCleanups();
+
+    options = options || {};
+    pendingLanding = options.landing === "bottom" ? "bottom" : "top";
+    softSwap = !!options.softSwap;
+
+    REVEAL_PAGE = document.body.classList.contains("project-reveal");
+
     wireToggle(document.querySelector(".cta-button"), document.querySelector(".cta-wrap"));
 
     // Both interactions get wired unconditionally — whichever one the
@@ -925,5 +1002,13 @@
     wireGalleryFrames();
     wireSwipeBack();
     wireScrollFocus();
-  });
+  }
+
+  document.addEventListener("DOMContentLoaded", initCategoryPage);
+
+  // page-transition.js calls this again after swapping in another
+  // category's markup, and pauses/resumes the focus loop while a
+  // transition is in flight.
+  window.initCategoryPage = initCategoryPage;
+  window.galleryScrollControl = galleryScrollControl;
 })();
