@@ -63,10 +63,17 @@
   // Both acts are the same underlying quantity — how much of the next
   // page is showing — so the docked state is simply a detent partway
   // along it, rather than a separate mechanism.
-  var DOCK_DISTANCE = 200;  // over-scroll to raise the banner into place
+  //
+  // The distances below are what the gesture is mapped onto; the two
+  // thresholds are how much of one counts as meaning it. Both are set so
+  // that a single ordinary scroll — one notch of a wheel, one flick of a
+  // trackpad — carries a whole act. Asking for more than that turns a
+  // deliberate movement into something the reader has to repeat, which
+  // reads as the page ignoring them.
+  var DOCK_DISTANCE = 140;  // over-scroll to raise the banner into place
   var PULL_DISTANCE = 560;  // further gesture to pull the page up
-  var DOCK_AT = 0.5;        // release past this while lifting and it docks
-  var COMMIT_AT = 0.38;     // release past this while pulling and it completes
+  var DOCK_AT = 0.45;       // release past this while lifting and it docks
+  var COMMIT_AT = 0.16;     // release past this while pulling and it completes
   // Wheel has no "finger lifted" event, so a lull stands in for one.
   var WHEEL_IDLE_MS = 140;
   var SETTLE_MS = 760;
@@ -94,6 +101,32 @@
   function easeOutExpo(t) {
     return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
   }
+
+  // This file also runs inside the preview frames it creates below. In
+  // there it must do nothing but render the page — a preview that ran
+  // its own transition system would be a gallery inside a gallery.
+  var PREVIEW_FLAG = "pt-preview";
+  var previewMode = location.search.indexOf(PREVIEW_FLAG) !== -1;
+  if (previewMode) {
+    // Travelling backwards, the frame is standing in for the *end* of
+    // the previous page, which is where the reader left off.
+    if (location.search.indexOf(PREVIEW_FLAG + "=end") !== -1) {
+      window.addEventListener("load", function () {
+        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" });
+      });
+    }
+    return;
+  }
+
+  // Opened straight from disk, a browser refuses to let a page read
+  // another one with fetch — same-origin doesn't apply to file:// URLs,
+  // every file is its own opaque origin. Without the next page's markup
+  // there is nothing to swap in, so that route is closed and the layer
+  // shows the real page in a frame instead. It costs the seamless
+  // hand-off at the end (a frame's document can't be adopted into this
+  // one), but everything up to it — the docked banner, the whole page
+  // rising as one block — is the genuine article rather than a stand-in.
+  var CAN_READ_PAGES = location.protocol !== "file:";
 
   var current = pageKey(location.pathname);
   var neighbours = CHAIN[current];
@@ -140,7 +173,41 @@
   var layerInner = document.createElement("div");
   layerInner.className = "pt-layer-inner";
   layer.appendChild(layerInner);
+
+  // Kept apart from layerInner, which gets emptied on every transition —
+  // these frames are loaded once and reused, and reinserting an iframe
+  // makes it reload from scratch.
+  var frameHolder = document.createElement("div");
+  frameHolder.className = "pt-frames";
+  layer.appendChild(frameHolder);
+
   body.appendChild(layer);
+
+  var frames = {};
+
+  function frameFor(href, forEnd) {
+    if (!href || href === "home.html") return null;
+    var key = href + (forEnd ? "#end" : "");
+    if (frames[key]) return frames[key];
+    var frame = document.createElement("iframe");
+    frame.className = "pt-frame";
+    frame.setAttribute("aria-hidden", "true");
+    frame.setAttribute("tabindex", "-1");
+    // Deliberately scrollable: the backwards preview positions itself at
+    // the previous page's end, and scrolling="no" would stop it doing
+    // that. The reader can't scroll it by hand anyway — .pt-frames takes
+    // no pointer events.
+    frame.src = href + "?" + PREVIEW_FLAG + (forEnd ? "=end" : "");
+    frameHolder.appendChild(frame);
+    frames[key] = frame;
+    return frame;
+  }
+
+  function showFrame(frame) {
+    Object.keys(frames).forEach(function (k) {
+      frames[k].classList.toggle("is-showing", frames[k] === frame);
+    });
+  }
 
   // ------------------------------------------------------------ prefetch
 
@@ -149,6 +216,31 @@
   // promise: a transition must never begin against a page that hasn't
   // arrived, or the reader spends the drag hauling up an empty panel.
   var ready = {};
+
+  // Fetching the markup early is only half of it: the pictures are what
+  // the reader actually sees, and an <img> only starts downloading once
+  // it's in a live document. Warming the ones that will be on screen
+  // during the pull means they're already decoded when the layer
+  // appears, instead of popping in one after another as it rises —
+  // which reads as the new page assembling itself rather than arriving.
+  var FIRST_SCREEN_PROJECTS = 3;
+
+  function warmFirstImages(doc) {
+    var items = doc.querySelectorAll(".gallery-item");
+    Array.prototype.slice.call(items, 0, FIRST_SCREEN_PROJECTS).forEach(function (item) {
+      // One picture per project, not the first few pictures on the page.
+      // A Web Design project is a stack of screenshots with only the
+      // active one displayed, so counting images would spend the whole
+      // budget inside the first carousel — on slides sitting behind its
+      // arrows that nobody is about to see — and leave the next two
+      // projects cold.
+      var img = item.querySelector("img.is-active") || item.querySelector("img");
+      var src = img && img.getAttribute("src");
+      if (!src) return;
+      var warm = new Image();
+      warm.src = src;
+    });
+  }
 
   function fetchPage(href) {
     if (cache[href]) return cache[href];
@@ -159,6 +251,7 @@
       })
       .then(function (html) {
         var parsed = new DOMParser().parseFromString(html, "text/html");
+        warmFirstImages(parsed);
         ready[href] = parsed;
         return parsed;
       })
@@ -170,8 +263,15 @@
   }
 
   // Warm both neighbours once the page itself is settled, so reaching an
-  // edge doesn't wait on the network.
+  // edge doesn't wait on the network. The frames are built here too, not
+  // when the gesture starts: an iframe has a whole page to load, and
+  // building it on demand would mean watching it arrive.
   function prefetchNeighbours() {
+    if (!CAN_READ_PAGES) {
+      frameFor(neighbours.next, false);
+      frameFor(neighbours.prev, true);
+      return;
+    }
     [neighbours.prev, neighbours.next].forEach(function (href) {
       if (href && href !== "home.html") fetchPage(href).catch(function () {});
     });
@@ -193,6 +293,12 @@
   var wheelIdleTimer = null;
   var previewOnly = false; // layer holds a stand-in, not the real page
   var recent = [];        // recent gesture deltas, for the flick test
+  // Set when a gesture has already carried an act through to its end.
+  // A trackpad flick is one movement of the hand but hundreds of events,
+  // and it keeps arriving long after the banner has docked; without this
+  // the tail of a single swipe would run straight on into pulling the
+  // page up. One push, one step — the rest of that push is absorbed.
+  var gestureSpent = false;
 
   // How much of the viewport the docked banner occupies — the detent
   // partway along the reveal. Going backwards there is no banner to
@@ -331,6 +437,9 @@
     layerInner.innerHTML = "";
     layerInner.style.transform = "";
 
+    var frame = null;
+    showFrame(null);
+
     if (target === "home.html") {
       previewOnly = true;
       layerInner.appendChild(homePreview());
@@ -339,6 +448,16 @@
       previewOnly = false;
       layer.classList.remove("is-home");
       layerInner.appendChild(fillLayerFrom(ready[target]));
+    } else if (!CAN_READ_PAGES) {
+      // Opened from disk. The page can't be read, but it can be shown:
+      // the frame renders the genuine next category, running its own
+      // stylesheet and its own focus effect, so what rises is the real
+      // thing rather than a stand-in. Only the hand-off at the very end
+      // has to fall back to an ordinary navigation.
+      previewOnly = true;
+      layer.classList.remove("is-home");
+      frame = frameFor(target, direction === "prev");
+      showFrame(frame);
     } else {
       // Show the category's banner rather than declining the gesture,
       // and keep trying for the real page in the background — if it
@@ -352,12 +471,25 @@
     layer.classList.add("is-active");
     layer.classList.toggle("from-below", direction === "next");
     layer.classList.toggle("from-above", direction === "prev");
+    layer.classList.toggle("has-frame", !!frame);
 
     // Read the real strip rather than assuming 4rem — it is what decides
     // where the detent sits, so a guess would leave the banner floating
-    // shy of the edge or bleeding past it.
-    var strip = layerInner.querySelector(".scroll-banner, .pt-home-banner");
+    // shy of the edge or bleeding past it. A frame's contents are a
+    // separate document and can't be measured through, but it is running
+    // this same stylesheet, so this page's own banner is the same strip.
+    var strip = frame
+      ? document.querySelector(".pt-shell .scroll-banner")
+      : layerInner.querySelector(".scroll-banner, .pt-home-banner");
     bannerHeight = strip ? Math.round(strip.getBoundingClientRect().height) || 64 : 64;
+
+    // Dress the copy as it will look once it lands, so the layer is
+    // already a finished page rather than a flat one that has to
+    // resolve into it. This has to come *after* the layer is displayed:
+    // it measures the contents, and a display:none box reports every
+    // rect as zero, which quietly yields a focus value computed from
+    // nothing at all.
+    if (!previewOnly && window.applySettledFocus) window.applySettledFocus(layerInner);
 
     // Backwards there is no banner to announce, so it goes straight to
     // the pulling act rather than pausing at a detent of zero height.
@@ -379,7 +511,11 @@
   // that meets them is the previous page's *end*, not its beginning.
   function alignLayerContent() {
     if (direction === "prev") {
-      var overflow = layerInner.scrollHeight - window.innerHeight;
+      // A frame can't be offset from out here — it was asked to open at
+      // its own end instead (see PREVIEW_FLAG).
+      var overflow = layer.classList.contains("has-frame")
+        ? 0
+        : layerInner.scrollHeight - window.innerHeight;
       prevAlignOffset = overflow > 0 ? -overflow : 0;
       return;
     }
@@ -442,7 +578,8 @@
     scrim.classList.remove("is-active");
     scrim.style.opacity = "";
     layer.style.transform = "";
-    layer.classList.remove("is-active", "from-below", "from-above", "is-home");
+    layer.classList.remove("is-active", "from-below", "from-above", "is-home", "has-frame");
+    showFrame(null);
     layerInner.innerHTML = "";
     layerInner.style.transform = "";
     document.documentElement.classList.remove("pt-transitioning");
@@ -458,6 +595,7 @@
     armed = false;
     busy = false;
     previewOnly = false;
+    gestureSpent = false;
     recent.length = 0;
   }
 
@@ -507,6 +645,16 @@
     });
   }
 
+  // Marks the destination of a hand-off that had to go through a real
+  // navigation, so it knows two things the transition can't tell it any
+  // other way: don't fade in, and — travelling backwards — open at your
+  // end rather than your beginning, because the end is what the reader
+  // was just looking at. Read by transition.js and category-page.js, and
+  // stripped from the URL once the page has settled.
+  function arrivalFlag(dir) {
+    return dir === "prev" ? "#pt-in=bottom" : "#pt-in";
+  }
+
   function commit() {
     var href = target;
     var wasDirection = direction;
@@ -519,10 +667,15 @@
 
     animateTo(1, function () {
       if (!seamless) {
-        // The layer already covers the viewport, so handing off to the
-        // ordinary fade continues the same movement rather than cutting.
-        if (window.navigateWithFade) window.navigateWithFade(href);
-        else window.location.href = href;
+        // Straight there, with no fade. The layer is covering the
+        // viewport with the destination itself by this point, so fading
+        // out would dissolve the finished page to white and then have
+        // the real one build back from white behind it — the one visible
+        // seam in the whole movement. Navigating outright instead lets
+        // the browser hold these pixels until the new document can
+        // paint, and the flag tells that document not to fade in over
+        // something the reader is already looking at.
+        window.location.href = href + arrivalFlag(wasDirection);
         return;
       }
       // Synchronous: the document is already parsed and its nodes are
@@ -596,6 +749,14 @@
   }
 
   function release() {
+    // The gesture already spent itself on an act that ran to its stop.
+    // Letting go is what ends it, and what makes the next push a
+    // separate one.
+    if (gestureSpent) {
+      gestureSpent = false;
+      recent.length = 0;
+      return;
+    }
     if (!armed || busy) return;
     var decisive = velocity() >= FLICK_VELOCITY;
 
@@ -612,7 +773,12 @@
   // --------------------------------------------------------------- input
 
   function push(amount) {
-    if (busy) return false;
+    // Both of these consume the gesture rather than declining it. A
+    // settle is playing, or this push has already done what it came to
+    // do — either way the layer is covering the viewport, and letting
+    // the scroll fall through to the page underneath would slide the
+    // page out from behind it.
+    if (busy || gestureSpent) return armed;
 
     if (!armed) {
       if (amount > 0 && atBottom() && neighbours.next) direction = "next";
@@ -647,7 +813,16 @@
     reveal = computeReveal();
     render();
 
-    if (docked && actProgress() >= 1) commit();
+    // The act has been dragged all the way to its stop while the gesture
+    // is still going. Take the step now rather than sitting against the
+    // stop waiting for the wheel to fall quiet: the reader has already
+    // made their meaning plain, and holding out for a lull is what makes
+    // the page feel like it needs to be scrolled at twice.
+    if (actProgress() >= 1) {
+      gestureSpent = true;
+      if (docked) commit();
+      else settleToDock();
+    }
     return true;
   }
 

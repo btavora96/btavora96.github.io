@@ -65,10 +65,29 @@
   // simply stops rather than animating a gallery that no longer exists.
   var loopToken = 0;
 
+  // The one media unit inside a project that the focus effect drives.
+  // Gallery pages wrap it in .gallery-media (which is what the floating
+  // controls measure from, and what carries a tall piece's second snap
+  // stop); the placeholder pages still have it as a direct child.
+  var MEDIA_SELECTOR =
+    ":scope > img, :scope > .gallery-video, :scope > .gallery-frame-wrap, " +
+    ":scope > .gallery-media > img, :scope > .gallery-media > .gallery-video, " +
+    ":scope > .gallery-media > .gallery-frame-wrap";
+
   // Set by initCategoryPage: where this run should settle, and whether
   // it was reached by a soft swap rather than a real page load.
   var pendingLanding = "top";
   var softSwap = false;
+
+  // Scrolling *up* out of the top of a category walks back into the
+  // previous one, and what the reader was shown during that gesture was
+  // that page's end. When the hand-off has to go through a real
+  // navigation (see page-transition.js), this is how that lands here:
+  // read once, synchronously, because transition.js strips the flag off
+  // the URL as soon as the page has settled. One-shot — a later soft
+  // swap says where it wants to land itself.
+  var arrivalLanding =
+    /(^|#)pt-in=bottom(&|$)/.test(location.hash) ? "bottom" : null;
 
   // How long the caption/subtitle's own CSS transition (see
   // .gallery-subtitle / .cta-subtitle in category-page.css — opacity/
@@ -380,11 +399,7 @@
       // floating controls measure their horizontal anchor from, and what
       // carries a tall piece's second snap stop); the placeholder pages
       // still have it as .gallery-item's own direct child.
-      var media = item.querySelector(
-        ":scope > img, :scope > .gallery-video, :scope > .gallery-frame-wrap, " +
-        ":scope > .gallery-media > img, :scope > .gallery-media > .gallery-video, " +
-        ":scope > .gallery-media > .gallery-frame-wrap"
-      );
+      var media = item.querySelector(MEDIA_SELECTOR);
       if (!media) return null;
       return {
         item: item,
@@ -631,10 +646,13 @@
     // not a real one, and gets undone once. A genuine user scroll
     // (flagged the moment any input starts) is never touched.
     //
-    // Skipped entirely after a soft swap: that quirk belongs to parsing
-    // a fresh document, and here the watcher would instead fight the
-    // deliberate landing position the transition just set.
-    if (!softSwap) {
+    // Skipped whenever a landing position was chosen for us — after a
+    // soft swap, or on arriving at a page's end from the one below it.
+    // The quirk this corrects belongs to parsing a fresh document at the
+    // top; anywhere else the watcher would just fight the deliberate
+    // position the transition set, since "not at zero" is precisely what
+    // it treats as the fault.
+    if (!softSwap && pendingLanding !== "bottom") {
       var userInteracted = false;
       ["pointerdown", "wheel", "touchstart", "keydown"].forEach(function (type) {
         listen(window, type, function () { userInteracted = true; }, { once: true, passive: true });
@@ -680,6 +698,7 @@
     // 0.19: a longer tail is what reads as gliding rather than tracking.
     var EASE = 0.12;
 
+    var seedFocus = softSwap;
     var lastFrameAt = performance.now();
     var easeStep = EASE;
     var slideEaseStep;
@@ -701,6 +720,95 @@
     // room to read the caption and reach the button, rather than still
     // scaled up and glowing underneath them.
     var EXIT_RELEASE_PX = 420;
+
+    // The shape of the focus effect, in one place. tick() eases toward
+    // these values frame by frame; applySettledFocus below assigns them
+    // outright. `top` and `height` are measured against whatever counts
+    // as the viewport for the caller — the real one for the live page,
+    // the transition layer's own box for a page being previewed inside
+    // it.
+    function focusTargetsFor(top, height, vh, isTall, startAligned) {
+      if (isTall) {
+        // Two-stop pieces: focus ramps up as the artwork's own top edge
+        // scrolls up through the viewport — reaching full focus once
+        // it's fully entered — holds there for as long as any part of
+        // it still fills the screen, and only ramps back down once
+        // stage two has had a chance to actually be seen. No centering
+        // nudge: it was never pulled toward a centre point.
+        var enterFocus = clamp((vh - top) / vh, 0, 1);
+        var afterVisible = vh - (top + height);
+        var exitFocus = clamp(1 - afterVisible / EXIT_RELEASE_PX, 0, 1);
+        return { focus: smoothstep(Math.min(enterFocus, exitFocus)), y: 0 };
+      }
+      // Focus falls off with distance from where this project actually
+      // comes to rest — not the same point for every item, so it has to
+      // match applySnapAlignment rather than assume the viewport centre.
+      // A centred item rests half a banner below centre; the first item
+      // on a page doesn't centre at all, it parks at the top margin.
+      var centre = top + height / 2;
+      var anchor = startAligned
+        ? TOP_SPACING_PX + height / 2
+        : vh / 2 + bannerHeight / 2;
+      var span = (vh / 2 + height / 2) * FOCUS_SPAN_FACTOR;
+      var dist = span > 0 ? clamp((centre - anchor) / span, -1, 1) : 0;
+      return { focus: smoothstep(clamp(1 - Math.abs(dist), 0, 1)), y: dist * -18 };
+    }
+
+    // What a given focus value looks like. Kept beside the formula so
+    // the two can't drift apart.
+    function focusStyleFor(focus, y) {
+      return {
+        scale: lerp(0.975, 1.035, focus),
+        y: y,
+        opacity: lerp(0.78, 1, focus),
+        brightness: lerp(0.96, 1.02, focus),
+        contrast: lerp(0.97, 1.03, focus),
+        blur: lerp(1.6, 0, focus),
+        shadowBlur: lerp(14, 30, focus),
+        shadowAlpha: lerp(0.07, 0.17, focus)
+      };
+    }
+
+    function writeFocus(media, v, slideX) {
+      var s = media.style;
+      s.setProperty("--gf-scale", v.scale.toFixed(4));
+      s.setProperty("--gf-y", v.y.toFixed(2) + "px");
+      s.setProperty("--gf-slide-x", (slideX || 0).toFixed(2) + "px");
+      s.setProperty("--gf-opacity", v.opacity.toFixed(3));
+      s.setProperty("--gf-brightness", v.brightness.toFixed(3));
+      s.setProperty("--gf-contrast", v.contrast.toFixed(3));
+      s.setProperty("--gf-blur", v.blur.toFixed(2) + "px");
+      s.setProperty("--gf-shadow-blur", v.shadowBlur.toFixed(1) + "px");
+      s.setProperty("--gf-shadow-alpha", v.shadowAlpha.toFixed(3));
+    }
+
+    // Dresses a copy of another page — the one page-transition.js is
+    // holding in its layer — as it will look once it lands, treating
+    // that layer's own box as the viewport.
+    //
+    // Without this the layer shows every project equally sharp and
+    // equally sized, which is already unlike the rest of the site; and
+    // the instant it becomes the page, the loop starts from those flat
+    // defaults and eases each image into its own focus state. That
+    // settling is per-image, so it reads as the new page's contents
+    // arriving one by one rather than as a single surface — however
+    // rigidly the surface itself moved.
+    window.applySettledFocus = function (root) {
+      if (!root) return;
+      var vh = window.innerHeight;
+      var originTop = root.getBoundingClientRect().top;
+      var items = root.querySelectorAll(".gallery-item");
+      Array.prototype.forEach.call(items, function (item, index) {
+        var media = item.querySelector(MEDIA_SELECTOR);
+        if (!media) return;
+        var r = media.getBoundingClientRect();
+        var isTall = r.height > vh * TALL_RATIO;
+        var t = focusTargetsFor(r.top - originTop, r.height, vh, isTall, index === 0 || isTall);
+        item.classList.toggle("gallery-item--tall", isTall);
+        writeFocus(media, focusStyleFor(t.focus, t.y), 0);
+      });
+    };
+
     // How far an open project's image slides left in reveal mode (see
     // revealActive) to make room for its text panel.
     var SLIDE_PX = 120;
@@ -735,21 +843,19 @@
     var panelOpen = false;
     var revealToken = 0;
 
-    // The button/panel hug whichever project is active horizontally —
-    // computed from the grid's own edge (constant across every project,
-    // since they all share the same centered column) rather than a
-    // flat viewport margin, so they always sit right at the image's own
-    // edge instead of drifting off into empty page margin on wide
-    // screens. The button itself rests well *outside* that edge while
-    // closed — clearly its own control, not overlapping the artwork —
-    // and glides inward when it opens, nesting *inside* the panel's own
-    // edge with a small margin of its own (not flush against it) so it
-    // reads as properly framed rather than hanging off the corner (see
-    // the `right` transition on .gallery-caption--floating in
-    // category-page.css). A negative PANEL_DOCK_INSET means the panel
-    // overhangs the image's right edge rather than tucking inside it.
+    // While closed, the button rests just outside the artwork's own right
+    // edge — clearly its own control rather than something laid over the
+    // work, and tied to the image so it doesn't drift off into empty page
+    // margin on a wide screen.
+    //
+    // Open, the panel takes its position from the window instead. Anchored
+    // to the image it stayed tucked in against the artwork, covering a
+    // good part of it and reading as sitting *over* the work rather than
+    // beside it; on a wide screen that also left a stretch of unused page
+    // to its right. Clamped so it can never cross back over the image's
+    // own edge once the window is too narrow to give it that room.
     var BUTTON_OUTSIDE_GAP = 84;
-    var PANEL_DOCK_INSET = -24;
+    var PANEL_VIEWPORT_MARGIN = 56;
     var BUTTON_DOCK_MARGIN = 14;
 
     function updateFloatingHorizontal() {
@@ -757,7 +863,7 @@
       var media = document.querySelector(".gallery-media");
       if (!media) return;
       var edgeGap = window.innerWidth - media.getBoundingClientRect().right;
-      var dockedInset = Math.max(0, edgeGap + PANEL_DOCK_INSET);
+      var dockedInset = Math.min(edgeGap, PANEL_VIEWPORT_MARGIN);
       if (floatingPanel) floatingPanel.style.right = dockedInset + "px";
       if (floatingBtn) {
         var btnWidth = floatingBtn.getBoundingClientRect().width || 40;
@@ -765,6 +871,9 @@
         // page margin is thinner than BUTTON_OUTSIDE_GAP, and without
         // this the button would end up flush against the screen edge.
         var outsideInset = Math.max(12, edgeGap - BUTTON_OUTSIDE_GAP - btnWidth);
+        // Docked, it nests inside the panel's own edge with a margin of
+        // its own rather than flush against it, so it reads as framed by
+        // the card instead of hung off its corner.
         var dockedBtnInset = dockedInset + BUTTON_DOCK_MARGIN;
         floatingBtn.style.right = (panelOpen ? dockedBtnInset : outsideInset) + "px";
       }
@@ -772,6 +881,38 @@
     if (REVEAL_PAGE) {
       updateFloatingHorizontal();
       listen(window, "resize", updateFloatingHorizontal);
+    }
+
+    // Vertically the control belongs to whichever project is active, so
+    // it lines up with that project's own middle — and therefore with a
+    // Web Design carousel's arrows, which sit at that same middle.
+    //
+    // A fixed point on screen isn't good enough: it happens to coincide
+    // for a project that rests centred, but the first project on every
+    // page rests aligned to the top instead (see applySnapAlignment),
+    // which left the button sitting well below its own arrows.
+    var FLOATING_EDGE_MARGIN = 90;
+
+    function updateFloatingVertical(rect) {
+      if (!rect || (!floatingBtn && !floatingPanel)) return;
+      var vh = window.innerHeight;
+      var room = vh - bannerHeight;
+      var centre = rect.height > room
+        // Taller than the space it has, so its real middle is off screen;
+        // the middle of what can actually be seen is the honest answer.
+        ? bannerHeight + room / 2
+        : rect.top + rect.height / 2;
+
+      // Keep it clear of both edges, and — while the card is open — far
+      // enough in that the card itself still fits.
+      var margin = FLOATING_EDGE_MARGIN;
+      if (panelOpen && floatingPanel) {
+        margin = Math.max(margin, floatingPanel.getBoundingClientRect().height / 2 + 16);
+      }
+      centre = clamp(centre, bannerHeight + margin, vh - margin);
+
+      if (floatingBtn) floatingBtn.style.top = centre.toFixed(1) + "px";
+      if (floatingPanel) floatingPanel.style.top = centre.toFixed(1) + "px";
     }
 
     function updateFloatingLabel() {
@@ -851,6 +992,17 @@
       easeStep = easeAmount(EASE, dt);
       slideEaseStep = easeAmount(SLIDE_EASE, dt);
 
+      // Straight to the target on the first frame after a swap. The
+      // layer already showed the page dressed this way (see
+      // applySettledFocus), so easing in from the defaults here would
+      // undo that and make every image settle again, one by one, at the
+      // exact moment the reader is meant to see one finished surface.
+      if (seedFocus) {
+        easeStep = 1;
+        slideEaseStep = 1;
+        seedFocus = false;
+      }
+
       if (galleryPaused) {
         requestAnimationFrame(tick);
         return;
@@ -859,6 +1011,7 @@
       var vh = window.innerHeight;
       var vCenter = vh / 2;
       var bestEntry = null;
+      var bestRect = null;
       var bestFocus = -1;
 
       entries.forEach(function (entry) {
@@ -870,46 +1023,14 @@
         // by the two, and then animate to a rest position it was never
         // snapped to.
         var isTall = entry.item.classList.contains("gallery-item--tall");
-        var focus, yTarget;
-
-        if (isTall) {
-          // Two-stop pieces: focus ramps up as the artwork's own top
-          // edge scrolls up through the viewport — reaching full focus
-          // once it's fully entered — holds there for as long as any
-          // part of it still fills the screen, and only ramps back
-          // down once stage two (bottom of the artwork + caption) has
-          // had a chance to actually be seen. No centering nudge: it
-          // was never being pulled toward a center point.
-          var enterFocus = clamp((vh - rect.top) / vh, 0, 1);
-          var afterVisible = vh - rect.bottom; // px of caption/gap already scrolled into view
-          var exitFocus = clamp(1 - afterVisible / EXIT_RELEASE_PX, 0, 1);
-          focus = smoothstep(Math.min(enterFocus, exitFocus));
-          yTarget = 0;
-        } else {
-          // Focus falls off with distance from where this project
-          // actually comes to rest — which is not the same point for
-          // every item, so it has to match applySnapAlignment rather
-          // than assume the viewport centre. A centred item rests half
-          // a banner below centre (the banner paints over the top of the
-          // scrollport); the first item on a page doesn't centre at all,
-          // it parks at the top margin. Measuring that one against the
-          // centre is what left it visibly blurred on load — on a phone
-          // its resting spot is nowhere near the middle of a tall
-          // viewport, so the page opened with its own first project
-          // already treated as out of focus.
-          var itemCenter = rect.top + rect.height / 2;
-          var focusAnchor = entry.startAligned
-            ? TOP_SPACING_PX + rect.height / 2
-            : vCenter + bannerHeight / 2;
-          var span = (vh / 2 + rect.height / 2) * FOCUS_SPAN_FACTOR;
-          var dist = span > 0 ? clamp((itemCenter - focusAnchor) / span, -1, 1) : 0;
-          focus = smoothstep(clamp(1 - Math.abs(dist), 0, 1));
-          yTarget = dist * -18;
-        }
+        var targets = focusTargetsFor(rect.top, rect.height, vh, isTall, entry.startAligned);
+        var focus = targets.focus;
+        var yTarget = targets.y;
 
         if (focus > bestFocus) {
           bestFocus = focus;
           bestEntry = entry;
+          bestRect = rect;
         }
 
         // Reveal-mode's slide-left-on-open, folded into the same
@@ -927,34 +1048,32 @@
         // between the two was doing most of the work of making scrolling
         // feel busy. Pulling them in leaves the same depth cue with far
         // less visual noise.
+        var want = focusStyleFor(focus, yTarget);
         var cur = entry.cur;
-        cur.scale = lerp(cur.scale, lerp(0.975, 1.035, focus), easeStep);
-        cur.y = lerp(cur.y, yTarget, easeStep);
+        cur.scale = lerp(cur.scale, want.scale, easeStep);
+        cur.y = lerp(cur.y, want.y, easeStep);
         cur.slideX = lerp(cur.slideX, slideTarget, slideEaseStep);
-        cur.opacity = lerp(cur.opacity, lerp(0.78, 1, focus), easeStep);
-        cur.brightness = lerp(cur.brightness, lerp(0.96, 1.02, focus), easeStep);
-        cur.contrast = lerp(cur.contrast, lerp(0.97, 1.03, focus), easeStep);
-        cur.blur = lerp(cur.blur, lerp(1.6, 0, focus), easeStep);
-        cur.shadowBlur = lerp(cur.shadowBlur, lerp(14, 30, focus), easeStep);
-        cur.shadowAlpha = lerp(cur.shadowAlpha, lerp(0.07, 0.17, focus), easeStep);
+        cur.opacity = lerp(cur.opacity, want.opacity, easeStep);
+        cur.brightness = lerp(cur.brightness, want.brightness, easeStep);
+        cur.contrast = lerp(cur.contrast, want.contrast, easeStep);
+        cur.blur = lerp(cur.blur, want.blur, easeStep);
+        cur.shadowBlur = lerp(cur.shadowBlur, want.shadowBlur, easeStep);
+        cur.shadowAlpha = lerp(cur.shadowAlpha, want.shadowAlpha, easeStep);
 
-        var style = entry.media.style;
-        style.setProperty("--gf-scale", cur.scale.toFixed(4));
-        style.setProperty("--gf-y", cur.y.toFixed(2) + "px");
-        style.setProperty("--gf-slide-x", cur.slideX.toFixed(2) + "px");
-        style.setProperty("--gf-opacity", cur.opacity.toFixed(3));
-        style.setProperty("--gf-brightness", cur.brightness.toFixed(3));
-        style.setProperty("--gf-contrast", cur.contrast.toFixed(3));
-        style.setProperty("--gf-blur", cur.blur.toFixed(2) + "px");
-        style.setProperty("--gf-shadow-blur", cur.shadowBlur.toFixed(1) + "px");
-        style.setProperty("--gf-shadow-alpha", cur.shadowAlpha.toFixed(3));
+        writeFocus(entry.media, cur, cur.slideX);
       });
 
       // A momentarily-null bestEntry (e.g. a frame caught mid-reflow,
       // before any rect has a sane height yet) must never itself count
       // as "focus moved elsewhere" — that would silently close whatever
       // was open. Only a real, positively-focused entry can take over.
-      if (floatingBtn && bestEntry) setActiveEntry(bestEntry);
+      if (floatingBtn && bestEntry) {
+        setActiveEntry(bestEntry);
+        // Tracked every frame rather than set once: the arrows move
+        // with the artwork as it scrolls, so the button has to as well
+        // to stay level with them.
+        updateFloatingVertical(bestRect);
+      }
 
       requestAnimationFrame(tick);
     }
@@ -970,7 +1089,9 @@
     runCleanups();
 
     options = options || {};
-    pendingLanding = options.landing === "bottom" ? "bottom" : "top";
+    pendingLanding =
+      (options.landing || arrivalLanding) === "bottom" ? "bottom" : "top";
+    arrivalLanding = null;
     softSwap = !!options.softSwap;
 
     REVEAL_PAGE = document.body.classList.contains("project-reveal");

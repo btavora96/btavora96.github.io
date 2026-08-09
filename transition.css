@@ -18,6 +18,16 @@ body.page-leaving {
   transition: opacity 160ms ease-in;
 }
 
+/* Arriving at the end of a scroll transition (see page-transition.js).
+   The page being left behind was already covered, edge to edge, by a
+   live copy of this very page, so there is nothing to fade in from —
+   the reader is already looking at it. Fading anyway means dissolving
+   the finished picture out to white and building it back, which is
+   exactly the flash this removes. */
+html.pt-arrival body.page-ready {
+  transition: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   body.page-ready,
   body.page-leaving {

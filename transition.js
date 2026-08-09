@@ -11,6 +11,16 @@
   var FADE_OUT_MS = 160;
   var MAX_READY_WAIT_MS = 2000;
 
+  // page-transition.js hands off to a real navigation when it can't swap
+  // a page in place, and marks the destination so it knows not to fade:
+  // the previous page was already showing this one, full-screen, at the
+  // moment it left. Read synchronously — the flag has to be in place
+  // before the first paint, and stripped from the URL only once the page
+  // has settled, so anything else reading it still can.
+  var ARRIVAL_FLAG = "pt-in";
+  var arrival = new RegExp("(^|#)" + ARRIVAL_FLAG + "(=|$)").test(location.hash);
+  if (arrival) document.documentElement.classList.add("pt-arrival");
+
   function markReady() {
     document.body.classList.add("page-ready");
   }
@@ -43,6 +53,14 @@
     Promise.all([domReady(), bodyBackgroundReady()]),
     new Promise(function (resolve) { window.setTimeout(resolve, MAX_READY_WAIT_MS); })
   ]).then(markReady);
+
+  // The flag has done its job by now; leaving it behind would put it in
+  // the address bar and in any link the reader copies from it.
+  if (arrival) {
+    window.addEventListener("load", function () {
+      history.replaceState(history.state, "", location.pathname + location.search);
+    });
+  }
 
   // bfcache restore (native browser back/forward, as opposed to clicking
   // our own links): the page can come back exactly as it was left,
