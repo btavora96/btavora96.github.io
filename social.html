@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Social Media — Projetos</title>
-  <link rel="stylesheet" href="category-page.css?v=49" />
+  <link rel="stylesheet" href="category-page.css?v=52" />
   <link rel="stylesheet" href="transition.css?v=1" />
   <noscript><style>body { opacity: 1 !important; }</style></noscript>
 </head>
-<body>
+<body class="project-reveal">
 
   <div class="scroll-banner" aria-hidden="true">
     <div class="scroll-banner-track" style="background-image: url('assets/social/banner/social.svg'); --tile-vb-w: 547.07;"></div>
@@ -18,10 +18,21 @@
     <span class="back-icon" aria-hidden="true">&times;</span>
   </a>
 
+  <button type="button" class="gallery-caption gallery-caption--floating" aria-label="Ver projeto">
+    <span class="gallery-icon" aria-hidden="true">+</span>
+  </button>
+
+  <div class="gallery-textpanel gallery-textpanel--floating">
+    <p class="gallery-textpanel-title"></p>
+    <p class="gallery-subtitle"></p>
+  </div>
+
   <section class="project-grid">
     <div class="grid-inner grid-inner--stack">
-      <figure class="gallery-item">
-        <img src="assets/social/estoril-riviera.webp" alt="Estoril Riviera" />
+      <figure class="gallery-item" data-title="Estoril Riviera" data-description="Ver projeto">
+        <div class="gallery-media">
+          <img src="assets/social/estoril-riviera.webp" alt="Estoril Riviera" />
+        </div>
         <figcaption>
           <button type="button" class="gallery-caption" aria-label="Estoril Riviera — ver projeto">
             <span class="gallery-icon" aria-hidden="true">+</span>
@@ -29,8 +40,10 @@
           <p class="gallery-subtitle">Ver projeto</p>
         </figcaption>
       </figure>
-      <figure class="gallery-item">
-        <img src="assets/social/rud-jewelry.webp" alt="Rud Jewelry" loading="lazy" />
+      <figure class="gallery-item" data-title="Rud Jewelry" data-description="Ver projeto">
+        <div class="gallery-media">
+          <img src="assets/social/rud-jewelry.webp" alt="Rud Jewelry" loading="lazy" />
+        </div>
         <figcaption>
           <button type="button" class="gallery-caption" aria-label="Rud Jewelry — ver projeto">
             <span class="gallery-icon" aria-hidden="true">+</span>
@@ -38,8 +51,10 @@
           <p class="gallery-subtitle">Ver projeto</p>
         </figcaption>
       </figure>
-      <figure class="gallery-item">
-        <video src="assets/social/sanjugo.mp4" class="gallery-video" muted loop playsinline preload="none"></video>
+      <figure class="gallery-item" data-title="Sanjugo" data-description="Ver projeto">
+        <div class="gallery-media">
+          <video src="assets/social/sanjugo.mp4" class="gallery-video" muted loop playsinline preload="none"></video>
+        </div>
         <figcaption>
           <button type="button" class="gallery-caption" aria-label="Sanjugo — ver projeto">
             <span class="gallery-icon" aria-hidden="true">+</span>
@@ -47,8 +62,10 @@
           <p class="gallery-subtitle">Ver projeto</p>
         </figcaption>
       </figure>
-      <figure class="gallery-item">
-        <img src="assets/social/stage-35.webp" alt="Stage 35" loading="lazy" />
+      <figure class="gallery-item" data-title="Stage 35" data-description="Ver projeto">
+        <div class="gallery-media">
+          <img src="assets/social/stage-35.webp" alt="Stage 35" loading="lazy" />
+        </div>
         <figcaption>
           <button type="button" class="gallery-caption" aria-label="Stage 35 — ver projeto">
             <span class="gallery-icon" aria-hidden="true">+</span>
@@ -56,8 +73,10 @@
           <p class="gallery-subtitle">Ver projeto</p>
         </figcaption>
       </figure>
-      <figure class="gallery-item">
-        <video src="assets/social/sumol-summer-fest.mp4" class="gallery-video" muted loop playsinline preload="none"></video>
+      <figure class="gallery-item" data-title="Sumol Summer Fest" data-description="Ver projeto">
+        <div class="gallery-media">
+          <video src="assets/social/sumol-summer-fest.mp4" class="gallery-video" muted loop playsinline preload="none"></video>
+        </div>
         <figcaption>
           <button type="button" class="gallery-caption" aria-label="Sumol Summer Fest — ver projeto">
             <span class="gallery-icon" aria-hidden="true">+</span>
@@ -69,6 +88,6 @@
   </section>
 
   <script src="transition.js?v=3" defer></script>
-  <script src="category-page.js?v=42" defer></script>
+  <script src="category-page.js?v=45" defer></script>
 </body>
 </html>

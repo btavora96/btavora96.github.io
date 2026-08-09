@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Web Design — Projetos</title>
-  <link rel="stylesheet" href="category-page.css?v=49" />
+  <link rel="stylesheet" href="category-page.css?v=52" />
   <link rel="stylesheet" href="transition.css?v=1" />
   <noscript><style>body { opacity: 1 !important; }</style></noscript>
 </head>
-<body>
+<body class="project-reveal">
 
   <div class="scroll-banner" aria-hidden="true">
     <div class="scroll-banner-track" style="background-image: url('assets/webdesign/banner/webdesign-banner.svg'); --tile-vb-w: 616.11;"></div>
@@ -18,21 +18,32 @@
     <span class="back-icon" aria-hidden="true">&times;</span>
   </a>
 
+  <button type="button" class="gallery-caption gallery-caption--floating" aria-label="Ver projeto">
+    <span class="gallery-icon" aria-hidden="true">+</span>
+  </button>
+
+  <div class="gallery-textpanel gallery-textpanel--floating">
+    <p class="gallery-textpanel-title"></p>
+    <p class="gallery-subtitle"></p>
+  </div>
+
   <section class="project-grid">
     <div class="grid-inner grid-inner--stack">
-      <figure class="gallery-item">
-        <div class="gallery-frame-wrap" style="--frame-h: 33rem;">
-          <div class="gallery-frame">
-            <img src="assets/webdesign/361-retail.webp" alt="361 Retail — imagem 1" class="is-active" />
-            <img src="assets/webdesign/361-retail(2).webp" alt="361 Retail — imagem 2" loading="lazy" />
-            <img src="assets/webdesign/361-retail(3).webp" alt="361 Retail — imagem 3" loading="lazy" />
-            <img src="assets/webdesign/361-retail(4).webp" alt="361 Retail — imagem 4" loading="lazy" />
-            <img src="assets/webdesign/361-retail(5).webp" alt="361 Retail — imagem 5" loading="lazy" />
-            <img src="assets/webdesign/361-retail(6).webp" alt="361 Retail — imagem 6" loading="lazy" />
-            <img src="assets/webdesign/361-retail(7).webp" alt="361 Retail — imagem 7" loading="lazy" />
+      <figure class="gallery-item" data-title="361 Retail" data-description="Ver projeto">
+        <div class="gallery-media">
+          <div class="gallery-frame-wrap" style="--frame-h: 33rem;">
+            <div class="gallery-frame">
+              <img src="assets/webdesign/361-retail.webp" alt="361 Retail — imagem 1" class="is-active" />
+              <img src="assets/webdesign/361-retail(2).webp" alt="361 Retail — imagem 2" loading="lazy" />
+              <img src="assets/webdesign/361-retail(3).webp" alt="361 Retail — imagem 3" loading="lazy" />
+              <img src="assets/webdesign/361-retail(4).webp" alt="361 Retail — imagem 4" loading="lazy" />
+              <img src="assets/webdesign/361-retail(5).webp" alt="361 Retail — imagem 5" loading="lazy" />
+              <img src="assets/webdesign/361-retail(6).webp" alt="361 Retail — imagem 6" loading="lazy" />
+              <img src="assets/webdesign/361-retail(7).webp" alt="361 Retail — imagem 7" loading="lazy" />
+            </div>
+            <button type="button" class="gallery-frame-arrow gallery-frame-arrow--prev" aria-label="Imagem anterior">&larr;</button>
+            <button type="button" class="gallery-frame-arrow gallery-frame-arrow--next" aria-label="Imagem seguinte">&rarr;</button>
           </div>
-          <button type="button" class="gallery-frame-arrow gallery-frame-arrow--prev" aria-label="Imagem anterior">&larr;</button>
-          <button type="button" class="gallery-frame-arrow gallery-frame-arrow--next" aria-label="Imagem seguinte">&rarr;</button>
         </div>
         <figcaption>
           <button type="button" class="gallery-caption" aria-label="361 Retail — ver projeto">
@@ -42,16 +53,18 @@
         </figcaption>
       </figure>
 
-      <figure class="gallery-item">
-        <div class="gallery-frame-wrap" style="--frame-h: 33rem;">
-          <div class="gallery-frame">
-            <img src="assets/webdesign/hanbaga(1).webp" alt="Hanbaga — imagem 1" loading="lazy" class="is-active" />
-            <img src="assets/webdesign/hanbaga(2).webp" alt="Hanbaga — imagem 2" loading="lazy" />
-            <img src="assets/webdesign/hanbaga(3).webp" alt="Hanbaga — imagem 3" loading="lazy" />
-            <img src="assets/webdesign/hanbaga(4).webp" alt="Hanbaga — imagem 4" loading="lazy" />
+      <figure class="gallery-item" data-title="Hanbaga" data-description="Ver projeto">
+        <div class="gallery-media">
+          <div class="gallery-frame-wrap" style="--frame-h: 33rem;">
+            <div class="gallery-frame">
+              <img src="assets/webdesign/hanbaga(1).webp" alt="Hanbaga — imagem 1" loading="lazy" class="is-active" />
+              <img src="assets/webdesign/hanbaga(2).webp" alt="Hanbaga — imagem 2" loading="lazy" />
+              <img src="assets/webdesign/hanbaga(3).webp" alt="Hanbaga — imagem 3" loading="lazy" />
+              <img src="assets/webdesign/hanbaga(4).webp" alt="Hanbaga — imagem 4" loading="lazy" />
+            </div>
+            <button type="button" class="gallery-frame-arrow gallery-frame-arrow--prev" aria-label="Imagem anterior">&larr;</button>
+            <button type="button" class="gallery-frame-arrow gallery-frame-arrow--next" aria-label="Imagem seguinte">&rarr;</button>
           </div>
-          <button type="button" class="gallery-frame-arrow gallery-frame-arrow--prev" aria-label="Imagem anterior">&larr;</button>
-          <button type="button" class="gallery-frame-arrow gallery-frame-arrow--next" aria-label="Imagem seguinte">&rarr;</button>
         </div>
         <figcaption>
           <button type="button" class="gallery-caption" aria-label="Hanbaga — ver projeto">
@@ -61,10 +74,12 @@
         </figcaption>
       </figure>
 
-      <figure class="gallery-item">
-        <div class="gallery-frame-wrap" style="--frame-h: 33rem;">
-          <div class="gallery-frame">
-            <img src="assets/webdesign/irú-omakase.webp" alt="Irú Omakase" loading="lazy" class="is-active" />
+      <figure class="gallery-item" data-title="Irú Omakase" data-description="Ver projeto">
+        <div class="gallery-media">
+          <div class="gallery-frame-wrap" style="--frame-h: 33rem;">
+            <div class="gallery-frame">
+              <img src="assets/webdesign/irú-omakase.webp" alt="Irú Omakase" loading="lazy" class="is-active" />
+            </div>
           </div>
         </div>
         <figcaption>
@@ -75,10 +90,12 @@
         </figcaption>
       </figure>
 
-      <figure class="gallery-item">
-        <div class="gallery-frame-wrap" style="--frame-h: 33.25rem;">
-          <div class="gallery-frame">
-            <img src="assets/webdesign/mitsu.webp" alt="Mitsu" loading="lazy" class="is-active" />
+      <figure class="gallery-item" data-title="Mitsu" data-description="Ver projeto">
+        <div class="gallery-media">
+          <div class="gallery-frame-wrap" style="--frame-h: 33.25rem;">
+            <div class="gallery-frame">
+              <img src="assets/webdesign/mitsu.webp" alt="Mitsu" loading="lazy" class="is-active" />
+            </div>
           </div>
         </div>
         <figcaption>
@@ -89,16 +106,18 @@
         </figcaption>
       </figure>
 
-      <figure class="gallery-item">
-        <div class="gallery-frame-wrap" style="--frame-h: 33rem;">
-          <div class="gallery-frame">
-            <img src="assets/webdesign/unigold.webp" alt="Unigold — imagem 1" loading="lazy" class="is-active" />
-            <img src="assets/webdesign/unigold(2).webp" alt="Unigold — imagem 2" loading="lazy" />
-            <img src="assets/webdesign/unigold(3).webp" alt="Unigold — imagem 3" loading="lazy" />
-            <img src="assets/webdesign/unigold(4).webp" alt="Unigold — imagem 4" loading="lazy" />
+      <figure class="gallery-item" data-title="Unigold" data-description="Ver projeto">
+        <div class="gallery-media">
+          <div class="gallery-frame-wrap" style="--frame-h: 33rem;">
+            <div class="gallery-frame">
+              <img src="assets/webdesign/unigold.webp" alt="Unigold — imagem 1" loading="lazy" class="is-active" />
+              <img src="assets/webdesign/unigold(2).webp" alt="Unigold — imagem 2" loading="lazy" />
+              <img src="assets/webdesign/unigold(3).webp" alt="Unigold — imagem 3" loading="lazy" />
+              <img src="assets/webdesign/unigold(4).webp" alt="Unigold — imagem 4" loading="lazy" />
+            </div>
+            <button type="button" class="gallery-frame-arrow gallery-frame-arrow--prev" aria-label="Imagem anterior">&larr;</button>
+            <button type="button" class="gallery-frame-arrow gallery-frame-arrow--next" aria-label="Imagem seguinte">&rarr;</button>
           </div>
-          <button type="button" class="gallery-frame-arrow gallery-frame-arrow--prev" aria-label="Imagem anterior">&larr;</button>
-          <button type="button" class="gallery-frame-arrow gallery-frame-arrow--next" aria-label="Imagem seguinte">&rarr;</button>
         </div>
         <figcaption>
           <button type="button" class="gallery-caption" aria-label="Unigold — ver projeto">
@@ -108,10 +127,12 @@
         </figcaption>
       </figure>
 
-      <figure class="gallery-item">
-        <div class="gallery-frame-wrap" style="--frame-h: 33rem;">
-          <div class="gallery-frame">
-            <img src="assets/webdesign/zō.webp" alt="Zō" loading="lazy" class="is-active" />
+      <figure class="gallery-item" data-title="Zō" data-description="Ver projeto">
+        <div class="gallery-media">
+          <div class="gallery-frame-wrap" style="--frame-h: 33rem;">
+            <div class="gallery-frame">
+              <img src="assets/webdesign/zō.webp" alt="Zō" loading="lazy" class="is-active" />
+            </div>
           </div>
         </div>
         <figcaption>
@@ -125,6 +146,6 @@
   </section>
 
   <script src="transition.js?v=3" defer></script>
-  <script src="category-page.js?v=42" defer></script>
+  <script src="category-page.js?v=45" defer></script>
 </body>
 </html>

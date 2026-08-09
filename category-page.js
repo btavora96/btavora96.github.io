@@ -74,14 +74,32 @@
     window.scrollBy({ top: delta, behavior: reducedMotion ? "instant" : "smooth" });
   }
 
-  // Branding's project pages use a different interaction entirely (see
-  // body.project-reveal in branding.html): a single floating "+"/"×"
-  // button follows whichever project is currently in focus, sliding
-  // that project's image left to reveal a text panel beside it — see
-  // wireFloatingCaption inside wireScrollFocus. Social/Web Design keep
-  // this original per-item pill that toggles open and closed on
-  // repeated clicks.
-  var REVEAL_MODE = document.body.classList.contains("project-reveal");
+  // Gallery pages carry both interactions in their markup and swap
+  // between them by viewport (the CSS at the end of category-page.css
+  // is what shows one and hides the other):
+  //
+  // - Wide enough, and a single floating "+"/"×" button follows whichever
+  //   project is in focus, sliding that project's image left to reveal a
+  //   text panel in the space beside it.
+  // - Narrower than that there's no room beside the artwork for a panel,
+  //   so each project falls back to its own pill underneath, opening the
+  //   description inline.
+  //
+  // This has to be a live query rather than a value read once: a window
+  // resized across the breakpoint has to switch behaviour with the CSS,
+  // not stay on whichever mode happened to be right at load.
+  var REVEAL_PAGE = document.body.classList.contains("project-reveal");
+  var revealQuery = window.matchMedia("(min-width: 701px)");
+  function revealActive() {
+    return REVEAL_PAGE && revealQuery.matches;
+  }
+
+  // matchMedia's listener API was renamed; older Safari only has the
+  // deprecated form.
+  function onRevealBreakpointChange(handler) {
+    if (revealQuery.addEventListener) revealQuery.addEventListener("change", handler);
+    else if (revealQuery.addListener) revealQuery.addListener(handler);
+  }
 
   function wireToggle(button, wrap) {
     if (!button || !wrap) return;
@@ -238,6 +256,63 @@
   }
 
   /**
+   * Swipe sideways to go back, for the layouts that hide the back button
+   * itself (see the mobile rules at the end of category-page.css).
+   *
+   * Rather than repeating that media query here, this reads the button's
+   * own computed style at the start of each gesture: the swipe is armed
+   * precisely when the button is hidden, so the two can't fall out of
+   * step, and a window resized across the breakpoint needs no handling
+   * of its own. It also means the gesture never competes with a back
+   * button the reader can already see.
+   *
+   * Rightward, matching the platform-standard back gesture, and only
+   * when the movement is clearly more horizontal than vertical — this
+   * page's whole interaction is vertical scrolling, so a drifting scroll
+   * must never navigate away.
+   */
+  function wireSwipeBack() {
+    var link = document.querySelector(".back-button");
+    if (!link || !link.getAttribute("href")) return;
+
+    var MIN_DISTANCE_PX = 70; // far enough that a tap or a nudge can't trigger it
+    var MAX_OFF_AXIS_RATIO = 0.6;
+    var startX = 0;
+    var startY = 0;
+    var tracking = false;
+
+    document.addEventListener("touchstart", function (e) {
+      // Single finger only — a pinch or two-finger gesture isn't a swipe.
+      tracking = e.touches.length === 1 &&
+        window.getComputedStyle(link).display === "none";
+      if (!tracking) return;
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    document.addEventListener("touchcancel", function () {
+      tracking = false;
+    }, { passive: true });
+
+    document.addEventListener("touchend", function (e) {
+      if (!tracking) return;
+      tracking = false;
+      var touch = e.changedTouches && e.changedTouches[0];
+      if (!touch) return;
+
+      var dx = touch.clientX - startX;
+      var dy = touch.clientY - startY;
+      if (dx < MIN_DISTANCE_PX) return;
+      if (Math.abs(dy) > Math.abs(dx) * MAX_OFF_AXIS_RATIO) return;
+
+      // Same fade every other link on the site uses (see transition.js),
+      // so arriving home looks identical however you got there.
+      if (window.navigateWithFade) window.navigateWithFade(link.href);
+      else window.location.href = link.href;
+    }, { passive: true });
+  }
+
+  /**
    * Scroll-driven focus effect: the gallery item nearest the viewport's
    * vertical center reads as "in focus" — sharp, slightly larger, fully
    * opaque, a stronger shadow — while items further away recede (smaller,
@@ -259,19 +334,25 @@
 
     var items = Array.prototype.slice.call(document.querySelectorAll(".gallery-item"));
     var entries = items.map(function (item) {
-      // Branding (REVEAL_MODE) nests its media one level deeper, inside
-      // .gallery-media, alongside the text panel it slides beside —
-      // everything else still has the image/video as .gallery-item's
-      // own direct child.
+      // Gallery pages wrap their media in .gallery-media (it's what the
+      // floating controls measure their horizontal anchor from, and what
+      // carries a tall piece's second snap stop); the placeholder pages
+      // still have it as .gallery-item's own direct child.
       var media = item.querySelector(
         ":scope > img, :scope > .gallery-video, :scope > .gallery-frame-wrap, " +
-        ":scope > .gallery-media > img, :scope > .gallery-media > .gallery-video"
+        ":scope > .gallery-media > img, :scope > .gallery-media > .gallery-video, " +
+        ":scope > .gallery-media > .gallery-frame-wrap"
       );
       if (!media) return null;
       return {
         item: item,
         media: media,
-        label: media.getAttribute("alt") || media.getAttribute("aria-label") || "",
+        // data-title rather than the media's own alt text: a Web Design
+        // item's media is a frame wrapper holding several screenshots,
+        // and a video has no alt at all, so neither reliably carries the
+        // project's name.
+        label: item.getAttribute("data-title") ||
+          media.getAttribute("alt") || media.getAttribute("aria-label") || "",
         description: item.getAttribute("data-description") || "",
         cur: {
           scale: 1, y: 0, slideX: 0, opacity: 1, brightness: 1, contrast: 1,
@@ -358,6 +439,10 @@
         // actually stop.
         var isTall = entry.media.offsetHeight > vh * TALL_RATIO;
         entry.item.classList.toggle("gallery-item--tall", isTall);
+        // Recorded for the focus effect, which has to measure each item
+        // against the position it actually comes to rest at — see
+        // focusAnchor in tick().
+        entry.startAligned = isFirst || isTall;
 
         if (isFirst || isTall) {
           // Both stop with their top edge a fixed distance below the
@@ -559,7 +644,7 @@
     // scaled up and glowing underneath them.
     var EXIT_RELEASE_PX = 420;
     // How far an open project's image slides left in reveal mode (see
-    // REVEAL_MODE) to make room for its text panel.
+    // revealActive) to make room for its text panel.
     var SLIDE_PX = 120;
     // A slower, distinct ease from EASE above — the slide is meant to
     // read as a deliberate, gliding motion rather than the snappier
@@ -574,19 +659,18 @@
     // hand-off.
     var REVEAL_SWAP_MS = 360;
 
-    // Branding's single floating "+"/"×" button and text panel (see
-    // REVEAL_MODE): rather than living inside each project like the
-    // other pages' per-item pill, both are single shared elements
-    // repositioned to sit right at the current project's own right
-    // edge (see updateFloatingHorizontal) and swapped — with a brief
-    // fade out/in, so each project visibly reads as having its own
-    // button and panel — as focus moves between projects. Opening one
-    // always starts fresh/closed for whichever project is now active;
-    // open/closed itself is otherwise untouched by scrolling — only
-    // clicking the button changes it, matching "closes only by
-    // clicking."
-    var floatingBtn = REVEAL_MODE ? document.querySelector(".gallery-caption--floating") : null;
-    var floatingPanel = REVEAL_MODE ? document.querySelector(".gallery-textpanel--floating") : null;
+    // The single floating "+"/"×" button and text panel (see
+    // revealActive): rather than living inside each project like the
+    // per-item pill, both are single shared elements repositioned to sit
+    // right at the current project's own right edge (see
+    // updateFloatingHorizontal) and swapped — with a brief fade out/in,
+    // so each project visibly reads as having its own button and panel —
+    // as focus moves between projects. Opening one always starts
+    // fresh/closed for whichever project is now active; open/closed
+    // itself is otherwise untouched by scrolling — only clicking the
+    // button changes it, matching "closes only by clicking."
+    var floatingBtn = REVEAL_PAGE ? document.querySelector(".gallery-caption--floating") : null;
+    var floatingPanel = REVEAL_PAGE ? document.querySelector(".gallery-textpanel--floating") : null;
     var floatingPanelTitle = floatingPanel ? floatingPanel.querySelector(".gallery-textpanel-title") : null;
     var floatingPanelText = floatingPanel ? floatingPanel.querySelector(".gallery-subtitle") : null;
     var activeEntry = null;
@@ -627,7 +711,7 @@
         floatingBtn.style.right = (panelOpen ? dockedBtnInset : outsideInset) + "px";
       }
     }
-    if (REVEAL_MODE) {
+    if (REVEAL_PAGE) {
       updateFloatingHorizontal();
       window.addEventListener("resize", updateFloatingHorizontal);
     }
@@ -677,6 +761,20 @@
         updateFloatingLabel();
         updateFloatingHorizontal(); // glide the button between its outside rest spot and the panel's edge
       });
+
+      // Crossing the breakpoint hides the panel by CSS but wouldn't
+      // otherwise clear the flag behind it — leaving the active
+      // project's image stuck in its slid-left position with nothing on
+      // screen to explain why, and the button reappearing already "open"
+      // if the window came back.
+      onRevealBreakpointChange(function () {
+        if (!panelOpen) return;
+        panelOpen = false;
+        floatingBtn.classList.remove("is-open");
+        if (floatingPanel) floatingPanel.classList.remove("is-open");
+        updateFloatingLabel();
+        updateFloatingHorizontal();
+      });
     }
 
     function tick() {
@@ -700,7 +798,13 @@
 
       entries.forEach(function (entry) {
         var rect = entry.media.getBoundingClientRect();
-        var isTall = rect.height > vh * 1.15;
+        // The class applySnapAlignment already set, rather than
+        // re-deriving it here from a rect that includes this very
+        // effect's own scale transform — measured that way an item
+        // sitting right on the threshold could be classed differently
+        // by the two, and then animate to a rest position it was never
+        // snapped to.
+        var isTall = entry.item.classList.contains("gallery-item--tall");
         var focus, yTarget;
 
         if (isTall) {
@@ -717,15 +821,23 @@
           focus = smoothstep(Math.min(enterFocus, exitFocus));
           yTarget = 0;
         } else {
-          // The media's own rect — short/normal items are already well
-          // under the viewport height, so this distance-from-center
-          // falloff works cleanly for all of them, including the first
-          // (start-aligned for cross-page consistency rather than
-          // centered, but still short enough it settles very close to
-          // its own peak focus anyway).
+          // Focus falls off with distance from where this project
+          // actually comes to rest — which is not the same point for
+          // every item, so it has to match applySnapAlignment rather
+          // than assume the viewport centre. A centred item rests half
+          // a banner below centre (the banner paints over the top of the
+          // scrollport); the first item on a page doesn't centre at all,
+          // it parks at the top margin. Measuring that one against the
+          // centre is what left it visibly blurred on load — on a phone
+          // its resting spot is nowhere near the middle of a tall
+          // viewport, so the page opened with its own first project
+          // already treated as out of focus.
           var itemCenter = rect.top + rect.height / 2;
+          var focusAnchor = entry.startAligned
+            ? TOP_SPACING_PX + rect.height / 2
+            : vCenter + bannerHeight / 2;
           var span = (vh / 2 + rect.height / 2) * FOCUS_SPAN_FACTOR;
-          var dist = span > 0 ? clamp((itemCenter - vCenter) / span, -1, 1) : 0;
+          var dist = span > 0 ? clamp((itemCenter - focusAnchor) / span, -1, 1) : 0;
           focus = smoothstep(clamp(1 - Math.abs(dist), 0, 1));
           yTarget = dist * -18;
         }
@@ -742,7 +854,7 @@
         // active project slides — as focus moves on, this eases back to
         // 0 on its own, and whichever project becomes active next picks
         // up the slide if the panel is still open.
-        var slideTarget = (REVEAL_MODE && panelOpen && entry === activeEntry) ? -SLIDE_PX : 0;
+        var slideTarget = (revealActive() && panelOpen && entry === activeEntry) ? -SLIDE_PX : 0;
 
         // Softer extremes than before (scale 0.96→1.06, opacity 0.6→1,
         // blur 2.5px): those ranges made an out-of-focus project read as
@@ -788,17 +900,30 @@
   document.addEventListener("DOMContentLoaded", function () {
     wireToggle(document.querySelector(".cta-button"), document.querySelector(".cta-wrap"));
 
-    // Branding's single floating button (wired inside wireScrollFocus,
-    // where the per-frame focus tracking already lives) replaces the
-    // per-item pill entirely — nothing to wire here for it.
-    if (!REVEAL_MODE) {
-      document.querySelectorAll(".gallery-item").forEach(function (item) {
-        wireToggle(item.querySelector(".gallery-caption"), item);
+    // Both interactions get wired unconditionally — whichever one the
+    // current viewport isn't using is display:none and so can't be
+    // clicked or focused anyway (the floating button is wired inside
+    // wireScrollFocus, where the per-frame focus tracking it depends on
+    // already lives). That's simpler and more robust than trying to
+    // tear down and re-wire handlers every time the window crosses the
+    // breakpoint.
+    document.querySelectorAll(".gallery-item").forEach(function (item) {
+      wireToggle(item.querySelector(".gallery-caption"), item);
+    });
+
+    // A project left open in one mode would otherwise still be open,
+    // and the gallery still paused, after switching to the other.
+    onRevealBreakpointChange(function () {
+      document.querySelectorAll(".is-open").forEach(function (el) {
+        el.classList.remove("is-open");
       });
-    }
+      document.documentElement.classList.remove(READING_CLASS);
+      galleryScrollControl.resume();
+    });
 
     wireVideoAutoplay();
     wireGalleryFrames();
+    wireSwipeBack();
     wireScrollFocus();
   });
 })();

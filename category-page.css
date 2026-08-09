@@ -286,12 +286,26 @@ body {
    aligning it to the viewport bottom leaves that much visible gap under
    the image instead. Without it the final project's stage two also
    lands beyond the page's own maximum scroll and can't be reached at
-   all, which is what made the end of the page snap upward and clip it. */
-.gallery-item--tall figcaption,
-body.project-reveal .gallery-item--tall .gallery-media {
+   all, which is what made the end of the page snap upward and clip it.
+
+   Which element carries it depends on which control is on screen: the
+   caption below the artwork when that's what's visible (mobile), and
+   the media box itself once the caption is hidden in favour of the
+   floating button (desktop — see the breakpoint rules further down).
+   Only ever one of the two, or a tall piece would end up with two
+   competing stops a caption's height apart. */
+.gallery-item--tall figcaption {
   scroll-snap-align: end;
   scroll-snap-stop: always;
   scroll-margin-bottom: 6rem;
+}
+
+@media (min-width: 701px) {
+  body.project-reveal .gallery-item--tall .gallery-media {
+    scroll-snap-align: end;
+    scroll-snap-stop: always;
+    scroll-margin-bottom: 6rem;
+  }
 }
 
 /* Scroll-driven focus effect (see wireScrollFocus in category-page.js):
@@ -311,7 +325,8 @@ body.project-reveal .gallery-item--tall .gallery-media {
 .gallery-item > .gallery-video,
 .gallery-item > .gallery-frame-wrap,
 .gallery-item > .gallery-media > img,
-.gallery-item > .gallery-media > .gallery-video {
+.gallery-item > .gallery-media > .gallery-video,
+.gallery-item > .gallery-media > .gallery-frame-wrap {
   --gf-scale: 1;
   --gf-y: 0px;
   --gf-slide-x: 0px;
@@ -339,7 +354,8 @@ body.project-reveal .gallery-item--tall .gallery-media {
   .gallery-item > .gallery-video,
   .gallery-item > .gallery-frame-wrap,
   .gallery-item > .gallery-media > img,
-  .gallery-item > .gallery-media > .gallery-video {
+  .gallery-item > .gallery-media > .gallery-video,
+  .gallery-item > .gallery-media > .gallery-frame-wrap {
     transform: none;
     opacity: 1;
     filter: none;
@@ -506,30 +522,34 @@ body.project-reveal .gallery-item--tall .gallery-media {
   margin-top: 0.5rem;
 }
 
-/* Branding-only "reveal" interaction (see body.project-reveal in
-   branding.html and REVEAL_MODE in category-page.js): a single
-   floating "+"/"×" button and a single floating text panel (see
-   .gallery-caption--floating / .gallery-textpanel--floating below)
-   both sit fixed to the viewport and simply re-target themselves to
-   whichever project currently has focus, rather than living inside
-   each project like the other pages' per-item pill + inline subtitle.
-   That's also why the panel is one shared, fixed-position element
-   instead of one per project: a tall piece's own box can run well
-   over 1000px, so a panel anchored *inside* it could end up centered
-   hundreds of pixels outside whatever's actually on screen, or get
-   left stranded on screen after scrolling past the project it was
-   opened for. Opening it slides the active project's image left (via
-   --gf-slide-x, driven by wireScrollFocus's own tick loop so it never
-   fights the JS-driven scale/blur transform for control of
-   `transform`). Social/Web Design keep the original per-item pill +
-   inline subtitle untouched. */
-body.project-reveal .gallery-media {
-  position: relative;
-}
+/* The "reveal" interaction (see body.project-reveal on every gallery
+   page, and revealActive() in category-page.js): a single floating
+   "+"/"×" button and a single floating text panel (see
+   .gallery-caption--floating / .gallery-textpanel--floating below) sit
+   fixed to the viewport and re-target themselves to whichever project
+   currently has focus. The panel is one shared, fixed-position element
+   rather than one per project because a tall piece's own box can run
+   well over 1000px — a panel anchored *inside* it could end up centred
+   hundreds of pixels off screen, or get left stranded after scrolling
+   past the project it was opened for. Opening it slides the active
+   project's image left (via --gf-slide-x, driven by wireScrollFocus's
+   own tick loop so it never fights the JS-driven scale/blur transform
+   for control of `transform`).
 
-/* (Reveal-mode tall pieces get their stage-two snap stop from the
-   shared .gallery-item--tall rule further up, which already targets
-   .gallery-media alongside the other pages' figcaption.) */
+   This is a desktop treatment: it wants room beside the artwork for the
+   panel, which a phone simply doesn't have. Below the breakpoint every
+   page falls back to the pill sitting under its own project, opening
+   the description inline — see the two breakpoint blocks at the end of
+   this section, which are what actually swap between the two. Both sets
+   of controls are always in the markup; only one is ever displayed. */
+
+/* Desktop: the floating button speaks for the project, so the per-item
+   pill and its inline text step aside entirely. */
+@media (min-width: 701px) {
+  body.project-reveal .gallery-item > figcaption {
+    display: none;
+  }
+}
 
 /* Frosted-glass card — legible over busy artwork without needing a
    flat, opaque block, and reads as a distinct, considered surface
@@ -688,15 +708,33 @@ body.project-reveal .gallery-media {
               transform 0.6s cubic-bezier(0.19, 1, 0.22, 1);
 }
 
+/* Mobile: no room beside the artwork for a panel, so the floating pair
+   is taken out of play entirely and every page falls back to the pill
+   under its own project (which is in the markup on all of them, just
+   hidden on desktop above). display:none rather than opacity so it also
+   stops being focusable and stops laying out. */
 @media (max-width: 700px) {
+  .gallery-caption--floating,
   .gallery-textpanel--floating {
-    right: 1.25rem;
-    width: min(78%, 22rem);
-    padding: 1.5rem 1.75rem;
+    display: none;
   }
 
-  .gallery-caption--floating {
-    right: 1.25rem;
+  /* Once the work is phone-width the desktop gap leaves projects the
+     better part of a screen apart, which reads as scrolling through
+     empty page rather than through a portfolio. The floor keeps small
+     phones from crowding, the ceiling keeps the tallest ones from
+     drifting back toward the problem; in between it lands around 50px
+     on a typical device. */
+  body.project-reveal .gallery-item {
+    margin-bottom: clamp(48px, 6vh, 55px);
+  }
+
+  /* Replaced here by a sideways swipe — see wireSwipeBack in
+     category-page.js, which keys off this very rule (it only arms the
+     gesture while the button is actually hidden), so the two can never
+     disagree about which is in play. */
+  body.project-reveal .back-button {
+    display: none;
   }
 }
 
