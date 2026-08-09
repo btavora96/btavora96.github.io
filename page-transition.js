@@ -40,15 +40,43 @@
     "webdesign.html": "Web Design"
   };
 
-  // How much over-scroll fully reveals the next page. Long enough that
-  // arriving there is unmistakably deliberate — a flick past the end of
-  // the gallery shouldn't tip you into another category.
-  var REVEAL_DISTANCE = 640;
-  // Release past this and it completes; below it, it falls back.
-  var COMMIT_AT = 0.42;
+  // Each category's own banner, so the strip that docks can be built
+  // without having fetched the page it belongs to. Kept in step with the
+  // inline style on each page's .scroll-banner-track.
+  var BANNERS = {
+    "branding.html":  { src: "assets/branding/banner/banner-branding.svg", tile: 442.117 },
+    "social.html":    { src: "assets/social/banner/social.svg",            tile: 547.07 },
+    "webdesign.html": { src: "assets/webdesign/banner/webdesign-banner.svg", tile: 616.11 }
+  };
+
+  // The reveal happens in two acts rather than one long drag.
+  //
+  // First, over-scrolling past the last project lifts the next
+  // category's banner up from below until it sits docked against the
+  // bottom edge — a stable place to stop, with that page announced but
+  // not yet entered. Two banners on screen, one at each edge.
+  //
+  // Then a second gesture pulls the page itself up: the docked banner
+  // travels to the top, where a category banner belongs, and the work
+  // follows it into view.
+  //
+  // Both acts are the same underlying quantity — how much of the next
+  // page is showing — so the docked state is simply a detent partway
+  // along it, rather than a separate mechanism.
+  var DOCK_DISTANCE = 200;  // over-scroll to raise the banner into place
+  var PULL_DISTANCE = 560;  // further gesture to pull the page up
+  var DOCK_AT = 0.5;        // release past this while lifting and it docks
+  var COMMIT_AT = 0.38;     // release past this while pulling and it completes
   // Wheel has no "finger lifted" event, so a lull stands in for one.
   var WHEEL_IDLE_MS = 140;
-  var SETTLE_MS = 620;
+  var SETTLE_MS = 760;
+  // px/ms of sustained push that completes regardless of distance.
+  var FLICK_VELOCITY = 1.1;
+  var VELOCITY_WINDOW_MS = 110;
+  // Body classes owned by the running document rather than by any one
+  // page's markup, and so carried across a swap rather than replaced by
+  // it. See swapTo.
+  var RUNTIME_BODY_CLASSES = ["page-ready", "page-leaving"];
 
   function pageKey(pathname) {
     var last = pathname.split("/").pop();
@@ -57,9 +85,15 @@
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-  // Expo-out: leaves the tail long, so a completing transition decelerates
-  // into place instead of stopping dead.
-  function easeOut(t) { return 1 - Math.pow(1 - t, 3); }
+  // For the settle only — never for the drag. A curve like this on
+  // gesture-linked motion inverts the whole feel: it is steepest at the
+  // start, so the first flick of the wheel throws half the next page up
+  // and the rest of the gesture has almost nothing left to do. What the
+  // hand is driving has to move with the hand, one to one; easing
+  // belongs to the part the machine plays once the hand lets go.
+  function easeOutExpo(t) {
+    return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  }
 
   var current = pageKey(location.pathname);
   var neighbours = CHAIN[current];
@@ -93,6 +127,13 @@
   }
   body.insertBefore(shell, body.firstChild);
 
+  // Sits between the outgoing page and the incoming one, and is the only
+  // thing that darkens the page being left behind.
+  var scrim = document.createElement("div");
+  scrim.className = "pt-scrim";
+  scrim.setAttribute("aria-hidden", "true");
+  body.appendChild(scrim);
+
   var layer = document.createElement("div");
   layer.className = "pt-layer";
   layer.setAttribute("aria-hidden", "true");
@@ -104,6 +145,10 @@
   // ------------------------------------------------------------ prefetch
 
   var cache = {};
+  // Parsed and ready to show. The gesture checks this rather than the
+  // promise: a transition must never begin against a page that hasn't
+  // arrived, or the reader spends the drag hauling up an empty panel.
+  var ready = {};
 
   function fetchPage(href) {
     if (cache[href]) return cache[href];
@@ -113,7 +158,9 @@
         return res.text();
       })
       .then(function (html) {
-        return new DOMParser().parseFromString(html, "text/html");
+        var parsed = new DOMParser().parseFromString(html, "text/html");
+        ready[href] = parsed;
+        return parsed;
       })
       .catch(function (err) {
         delete cache[href]; // let a later attempt try again
@@ -136,11 +183,44 @@
 
   var direction = null;   // "next" | "prev"
   var target = null;      // href being revealed
-  var travelled = 0;      // px of over-scroll accumulated
-  var progress = 0;
+  var travel = 0;         // px of gesture accumulated within the current act
+  var reveal = 0;         // 0 = hidden, 1 = the next page fills the viewport
+  var docked = false;     // the banner has taken its place at the bottom edge
+  var bannerHeight = 64;  // measured from the incoming page's own banner
+  var prevAlignOffset = 0;// holds the previous page's end against the edge
   var busy = false;       // a settle animation owns the layer
   var armed = false;      // layer is populated and visible
   var wheelIdleTimer = null;
+  var previewOnly = false; // layer holds a stand-in, not the real page
+  var recent = [];        // recent gesture deltas, for the flick test
+
+  // How much of the viewport the docked banner occupies — the detent
+  // partway along the reveal. Going backwards there is no banner to
+  // announce (the reader is returning to a page's end, not its start),
+  // so that direction has no detent and pulls straight through.
+  function dockFraction() {
+    if (direction === "prev") return 0;
+    return bannerHeight / window.innerHeight;
+  }
+
+  function actProgress() {
+    return docked
+      ? clamp(travel / PULL_DISTANCE, 0, 1)
+      : clamp(travel / DOCK_DISTANCE, 0, 1);
+  }
+
+  function computeReveal() {
+    var d = dockFraction();
+    return docked ? d + (1 - d) * actProgress() : d * actProgress();
+  }
+
+  function recordDelta(d) {
+    var now = performance.now();
+    recent.push({ t: now, d: d });
+    // Only the tail of the gesture says anything about intent; anything
+    // older is where the reader had already changed their mind.
+    while (recent.length && now - recent[0].t > VELOCITY_WINDOW_MS) recent.shift();
+  }
 
   function targetHref() {
     return direction === "next" ? neighbours.next : neighbours.prev;
@@ -183,13 +263,47 @@
 
   // ---------------------------------------------------------- layer setup
 
+  // Home gets a banner strip of its own so it docks the same way the
+  // categories do — it isn't injected (see the note at the top), but the
+  // gesture shouldn't behave differently just because of that.
   function homePreview() {
     var wrap = document.createElement("div");
     wrap.className = "pt-home-preview";
+
+    var strip = document.createElement("div");
+    strip.className = "pt-home-banner";
     var label = document.createElement("span");
     label.className = "pt-home-label";
     label.textContent = LABELS["home.html"];
-    wrap.appendChild(label);
+    strip.appendChild(label);
+
+    wrap.appendChild(strip);
+    return wrap;
+  }
+
+  // Stand-in for a category whose markup isn't available — most often
+  // because the site is being opened straight off disk, where browsers
+  // refuse fetch() on file:// URLs, but equally if the network drops.
+  // It carries that category's real banner, so the gesture looks and
+  // behaves exactly the same; only the hand-off at the end differs,
+  // falling back to the ordinary fade instead of swapping in place.
+  // Without this the transition simply declined to start, which is
+  // indistinguishable from the feature not existing.
+  function bannerPreview(href) {
+    var wrap = document.createElement("div");
+    wrap.className = "pt-page-preview";
+
+    var banner = document.createElement("div");
+    banner.className = "scroll-banner";
+    var track = document.createElement("div");
+    track.className = "scroll-banner-track";
+    var meta = BANNERS[href];
+    if (meta) {
+      track.style.backgroundImage = "url('" + meta.src + "')";
+      track.style.setProperty("--tile-vb-w", String(meta.tile));
+    }
+    banner.appendChild(track);
+    wrap.appendChild(banner);
     return wrap;
   }
 
@@ -218,26 +332,44 @@
     layerInner.style.transform = "";
 
     if (target === "home.html") {
+      previewOnly = true;
       layerInner.appendChild(homePreview());
       layer.classList.add("is-home");
-    } else {
+    } else if (ready[target]) {
+      previewOnly = false;
       layer.classList.remove("is-home");
-      var doc = null;
-      // Only a resolved fetch can be used synchronously; otherwise fill
-      // it in when it lands, mid-drag.
-      fetchPage(target).then(function (parsed) {
-        if (!armed || target !== targetHref()) return;
-        if (layerInner.childNodes.length) return;
-        layerInner.appendChild(fillLayerFrom(parsed));
-        alignLayerContent();
-      }).catch(function () {});
-      void doc;
+      layerInner.appendChild(fillLayerFrom(ready[target]));
+    } else {
+      // Show the category's banner rather than declining the gesture,
+      // and keep trying for the real page in the background — if it
+      // lands before the reader commits, the next attempt is seamless.
+      previewOnly = true;
+      layer.classList.remove("is-home");
+      layerInner.appendChild(bannerPreview(target));
+      fetchPage(target).catch(function () {});
     }
 
     layer.classList.add("is-active");
     layer.classList.toggle("from-below", direction === "next");
     layer.classList.toggle("from-above", direction === "prev");
+
+    // Read the real strip rather than assuming 4rem — it is what decides
+    // where the detent sits, so a guess would leave the banner floating
+    // shy of the edge or bleeding past it.
+    var strip = layerInner.querySelector(".scroll-banner, .pt-home-banner");
+    bannerHeight = strip ? Math.round(strip.getBoundingClientRect().height) || 64 : 64;
+
+    // Backwards there is no banner to announce, so it goes straight to
+    // the pulling act rather than pausing at a detent of zero height.
+    docked = direction === "prev";
+
+    alignLayerContent();
     document.documentElement.classList.add("pt-transitioning");
+    // Promote both moving surfaces for the duration only. Left on
+    // permanently this pins two full-page layers in memory for a page
+    // that spends nearly all its time not transitioning at all.
+    shell.style.willChange = "transform";
+    scrim.classList.add("is-active");
     if (window.galleryScrollControl) window.galleryScrollControl.pause();
     armed = true;
     return true;
@@ -246,39 +378,69 @@
   // Coming from above, the reader is travelling backwards, so the edge
   // that meets them is the previous page's *end*, not its beginning.
   function alignLayerContent() {
-    if (direction !== "prev") {
-      layerInner.style.transform = "";
+    if (direction === "prev") {
+      var overflow = layerInner.scrollHeight - window.innerHeight;
+      prevAlignOffset = overflow > 0 ? -overflow : 0;
       return;
     }
-    var overflow = layerInner.scrollHeight - window.innerHeight;
-    layerInner.style.transform = overflow > 0
-      ? "translate3d(0," + -overflow + "px,0)"
-      : "";
+
+    // Going forward the incoming page is left exactly as authored: its
+    // banner and its work keep the spacing they have on the page itself,
+    // and the whole thing travels as one slab. An earlier version rode
+    // the work up closer behind the banner and let that spacing open out
+    // during the pull — which meant the two moved at different rates and
+    // read as the banner arriving first and the page following it, when
+    // the whole point is that they arrive together.
+    prevAlignOffset = 0;
   }
 
   function render() {
-    var p = progress;
+    var vh = window.innerHeight;
     var sign = direction === "next" ? 1 : -1;
-    var eased = easeOut(p);
 
-    // The incoming page covers the full distance; the outgoing one moves
-    // a fraction of it and shrinks very slightly. The difference in
-    // speed is what reads as depth — one layer sliding over another
-    // rather than two things moving together.
-    layer.style.transform =
-      "translate3d(0," + (sign * (1 - eased) * 100) + "%,0)";
-    layer.style.setProperty("--pt-progress", p.toFixed(4));
+    // Driven in pixels, not percent, so the banner lands exactly on the
+    // viewport edge rather than a rounding of it. The banner sits at the
+    // top of the incoming page, so offsetting the layer by
+    // (viewport − banner height) is what parks it flush against the
+    // bottom.
+    var offset = (1 - reveal) * vh;
+    layer.style.transform = "translate3d(0," + (sign * offset).toFixed(2) + "px,0)";
+    layer.style.setProperty("--pt-progress", reveal.toFixed(4));
 
+    // Nothing inside the layer moves independently of it: the banner and
+    // the work are one surface, and the layer's own transform is what
+    // carries both. The only exception is travelling backwards, where
+    // the layer has to be showing the previous page's *end* rather than
+    // its beginning — a fixed offset, set once, not something that
+    // shifts during the gesture.
+    if (direction === "prev") {
+      layerInner.style.transform = prevAlignOffset
+        ? "translate3d(0," + prevAlignOffset + "px,0)"
+        : "";
+    }
+
+    // The page underneath barely stirs while the banner is only being
+    // announced, then gives way in earnest once it's actually being
+    // pulled up. Because both are read off the same reveal, one runs
+    // into the other with no seam at the detent.
     shell.style.transform =
-      "translate3d(0," + (-sign * eased * 14) + "vh,0) scale(" + (1 - eased * 0.05).toFixed(4) + ")";
-    shell.style.filter = "brightness(" + (1 - eased * 0.18).toFixed(3) + ")";
+      "translate3d(0," + (-sign * reveal * 18).toFixed(3) + "vh,0) scale(" +
+      (1 - reveal * 0.06).toFixed(4) + ")";
+    // Darkened by a scrim over the top rather than a filter on the page
+    // itself: brightness() forces the whole gallery — every image — to
+    // be repainted on every frame of the drag, which is the one thing
+    // here expensive enough to cost frames. Opacity on a separate layer
+    // costs nothing.
+    scrim.style.opacity = (reveal * 0.28).toFixed(3);
   }
 
   function clearVisuals() {
     // Removed outright rather than zeroed: an identity transform still
     // makes the shell a containing block for the page's fixed elements.
     shell.style.transform = "";
-    shell.style.filter = "";
+    shell.style.willChange = "";
+    scrim.classList.remove("is-active");
+    scrim.style.opacity = "";
     layer.style.transform = "";
     layer.classList.remove("is-active", "from-below", "from-above", "is-home");
     layerInner.innerHTML = "";
@@ -289,27 +451,52 @@
   function reset() {
     direction = null;
     target = null;
-    travelled = 0;
-    progress = 0;
+    travel = 0;
+    reveal = 0;
+    docked = false;
+    prevAlignOffset = 0;
     armed = false;
     busy = false;
+    previewOnly = false;
+    recent.length = 0;
   }
 
   // ------------------------------------------------------------- settling
 
   function animateTo(destination, done) {
     busy = true;
-    var from = progress;
+    var from = reveal;
     var start = performance.now();
-    var span = Math.max(160, SETTLE_MS * Math.abs(destination - from));
+    // Scaled to the distance left, but with a floor: completing from
+    // nearly-there should still read as a movement rather than a cut.
+    var span = Math.max(280, SETTLE_MS * Math.abs(destination - from));
 
     (function step(now) {
       var t = clamp((now - start) / span, 0, 1);
-      progress = from + (destination - from) * easeOut(t);
+      reveal = from + (destination - from) * easeOutExpo(t);
       render();
       if (t < 1) requestAnimationFrame(step);
       else done();
     })(start);
+  }
+  // Note that `busy` deliberately stays set when this finishes. Only the
+  // caller knows whether the gesture should be live again: the dock does
+  // want it back, but a commit must stay locked until the swap has
+  // actually happened — the page is fetched in between, and a scroll
+  // arriving in that window would otherwise arm a second transition on
+  // top of the one still completing, leaving its transforms applied to a
+  // page that had already moved on.
+
+  // The banner comes to rest against the bottom edge and stays there.
+  // This is a real stopping place, not a waypoint: the reader can leave
+  // it sitting, and only a further gesture takes it any further.
+  function settleToDock() {
+    animateTo(dockFraction(), function () {
+      docked = true;
+      travel = 0;
+      recent.length = 0;
+      busy = false; // resting, but still very much in play
+    });
   }
 
   function revert() {
@@ -323,41 +510,65 @@
   function commit() {
     var href = target;
     var wasDirection = direction;
+    // Whether the swap can happen in place comes down to what the layer
+    // is actually holding. If it holds a stand-in — Home, or a category
+    // that couldn't be fetched — then handing those nodes to the page
+    // would install the stand-in as the page. The document arriving
+    // late doesn't help: it isn't what's on screen.
+    var seamless = !previewOnly && !!ready[href];
 
     animateTo(1, function () {
-      if (href === "home.html") {
-        // Home isn't injected here (see the note at the top); the layer
-        // has covered the viewport, so handing off to the ordinary fade
-        // navigation continues the same movement rather than cutting.
+      if (!seamless) {
+        // The layer already covers the viewport, so handing off to the
+        // ordinary fade continues the same movement rather than cutting.
         if (window.navigateWithFade) window.navigateWithFade(href);
         else window.location.href = href;
         return;
       }
-
-      fetchPage(href).then(function (doc) {
-        swapTo(href, doc, wasDirection);
-      }).catch(function () {
-        window.location.href = href; // network gave out — fall back to a plain load
-      });
+      // Synchronous: the document is already parsed and its nodes are
+      // already on screen, so there is no reason to go back through a
+      // promise and risk a frame landing in between.
+      swapTo(href, ready[href], wasDirection);
     });
   }
 
   function swapTo(href, doc, wasDirection) {
-    // The layer is already showing this page full-screen, so the moment
-    // of exchange is hidden behind it.
     history.pushState({ pageTransition: true }, "", href);
     document.title = doc.title;
-    document.body.className = doc.body.className;
 
+    // The fetched document's body carries the classes that page was
+    // *authored* with, and nothing else. The running document has since
+    // added its own — page-ready above all, which transition.css uses to
+    // fade a page in and without which `body { opacity: 0 }` still
+    // applies. Copying the class list wholesale therefore drops it and
+    // hands the reader a perfectly laid out, completely invisible page.
+    // (Nothing in the geometry gives this away, which is why it survived
+    // so long: getBoundingClientRect reports the same numbers either
+    // way.)
+    var runtimeClasses = RUNTIME_BODY_CLASSES.filter(function (name) {
+      return document.body.classList.contains(name);
+    });
+    document.body.className = doc.body.className;
+    runtimeClasses.forEach(function (name) {
+      document.body.classList.add(name);
+    });
+
+    // Hand over the very nodes the layer has been showing, rather than
+    // building a second copy from the parsed document. A fresh clone
+    // means fresh <img> elements, and those have to be decoded again
+    // before they can paint — which is precisely where a blank frame
+    // comes from at the moment of exchange. These are already on screen
+    // and already decoded, so moving them is visually a no-op.
     shell.innerHTML = "";
-    var incoming = fillLayerFrom(doc);
-    // Undo the eager hint on the copy that becomes the real page —
-    // beyond the first screen these should stay lazy, as authored.
-    shell.appendChild(incoming);
+    while (layerInner.firstChild) shell.appendChild(layerInner.firstChild);
 
     current = href;
     neighbours = CHAIN[current];
 
+    // All of this — emptying the layer, uncovering it, and putting the
+    // page at its final scroll position — happens inside one task, so
+    // the browser paints it once, whole. Split across frames, the
+    // now-empty layer would flash its own background first.
     clearVisuals();
     reset();
 
@@ -370,9 +581,31 @@
     prefetchNeighbours();
   }
 
+  // A decisive flick should carry through even if it didn't get far in
+  // distance — that's the difference between a gesture with weight
+  // behind it and one the reader thought better of. Without this the
+  // only way through is to grind out the full threshold, which reads as
+  // the page resisting rather than responding.
+  function velocity() {
+    if (recent.length < 2) return 0;
+    var span = recent[recent.length - 1].t - recent[0].t;
+    if (span <= 0) return 0;
+    var sum = 0;
+    for (var i = 0; i < recent.length; i++) sum += recent[i].d;
+    return sum / span; // px per ms, positive == pushing onward
+  }
+
   function release() {
     if (!armed || busy) return;
-    if (progress >= COMMIT_AT) commit();
+    var decisive = velocity() >= FLICK_VELOCITY;
+
+    if (docked) {
+      if (actProgress() >= COMMIT_AT || decisive) commit();
+      else settleToDock(); // fall back to the banner's resting place
+      return;
+    }
+
+    if (actProgress() >= DOCK_AT || decisive) settleToDock();
     else revert();
   }
 
@@ -386,25 +619,35 @@
       else if (amount < 0 && atTop() && neighbours.prev) direction = "prev";
       else return false;
       if (!beginTransition()) { direction = null; return false; }
-      travelled = 0;
+      travel = 0;
     }
 
     var forward = direction === "next" ? amount : -amount;
-    travelled = clamp(travelled + forward, 0, REVEAL_DISTANCE);
+    recordDelta(forward);
 
-    // Pulled all the way back: hand the page its scrolling back rather
-    // than sitting in a zero-progress transition.
-    if (travelled <= 0) {
+    var limit = docked ? PULL_DISTANCE : DOCK_DISTANCE;
+    travel = Math.min(travel + forward, limit);
+
+    // Pulled back past the start of the current act. Stepping down from
+    // the docked state has to carry whatever is left of the gesture into
+    // the act below rather than swallowing it — otherwise a decisive
+    // scroll back up stalls at the dock instead of retracting, having
+    // spent its whole distance crossing a boundary.
+    if (travel <= 0 && docked) {
+      travel += DOCK_DISTANCE;
+      docked = false;
+    }
+    if (travel <= 0) {
       clearVisuals();
       if (window.galleryScrollControl) window.galleryScrollControl.resume();
       reset();
       return false;
     }
 
-    progress = travelled / REVEAL_DISTANCE;
+    reveal = computeReveal();
     render();
 
-    if (progress >= 1) commit();
+    if (docked && actProgress() >= 1) commit();
     return true;
   }
 

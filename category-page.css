@@ -761,6 +761,22 @@ body {
    outright afterwards.
    --------------------------------------------------------------------- */
 
+/* Darkens the outgoing page. A separate composited layer rather than a
+   filter on the page itself — see render() in page-transition.js. */
+.pt-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: none;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pt-scrim.is-active {
+  display: block;
+}
+
 .pt-layer {
   position: fixed;
   inset: 0;
@@ -805,14 +821,42 @@ body {
   position: relative;
   width: 100%;
   min-height: 100%;
+  /* Contains the gallery's own top margin. Without this that margin
+     collapses out through this box and shifts it down the page, which
+     puts everything measured from it — not least where the banner comes
+     to rest — out by exactly that margin. */
+  display: flow-root;
 }
 
 /* Home is previewed rather than injected — it has its own stylesheet
    that restyles body wholesale. This borrows its warm charcoal so the
    edge that appears belongs unmistakably to that page. */
+/* Stand-in for a category whose markup couldn't be fetched — opening
+   the site straight off disk is the usual reason, since browsers block
+   fetch() on file:// URLs. It carries that category's real banner, so
+   the gesture is identical; only the hand-off at the end falls back to
+   a fade. See bannerPreview in page-transition.js. */
+.pt-page-preview {
+  position: absolute;
+  inset: 0;
+  background: #ececee;
+}
+
 .pt-home-preview {
   position: absolute;
   inset: 0;
+  background: #17140f;
+}
+
+/* Same height and place as a category's own banner, so Home docks
+   against the bottom edge exactly as the categories do — the strip is
+   what the detent is measured from. */
+.pt-home-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -822,14 +866,10 @@ body {
 .pt-home-label {
   font-family: "Ouma Devanagari", sans-serif;
   font-weight: 400;
-  font-size: clamp(1.6rem, 5vw, 3rem);
-  letter-spacing: 0.14em;
+  font-size: 1.1rem;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.92);
-  /* Drifts up into place as the layer arrives, a touch behind it, so
-     the type settles rather than riding along rigidly. */
-  transform: translateY(calc((1 - var(--pt-progress, 0)) * 26px));
-  opacity: calc(var(--pt-progress, 0) * 1.4);
 }
 
 .project-cta {
