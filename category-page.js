@@ -77,6 +77,10 @@
   // Where this run should settle, and whether it was reached by a swap
   // rather than a page load.
   var pendingLanding = "top";
+  // Consumed the same way as pendingLanding: set per run, cleared once
+  // read, so a second run of initCategoryPage on the same document
+  // doesn't inherit the first arrival's circumstances.
+  var pendingFromTransition = false;
   var softSwap = false;
 
   // This page is loaded twice over: once as itself, and once inside the
@@ -95,6 +99,14 @@
   // soon as the page has settled.
   var arrivalLanding =
     /(^|#)pt-in=bottom(&|$)/.test(location.hash) ? "bottom" : null;
+
+  // Whether this page was reached by the scroll transition at all, as
+  // opposed to a keychain, a back button, or a typed address. Read from
+  // the same flag and for the same reason as above, one line earlier
+  // than it is stripped. It matters because a page handed a reader
+  // mid-gesture has a problem no other arrival has — see the refusal of
+  // the inbound gesture's tail in wireScrollFocus.
+  var arrivedByTransition = /(^|#)pt-in(=|$)/.test(location.hash);
 
   // How long the caption/subtitle's own CSS transition (see
   // .gallery-subtitle / .cta-subtitle in category-page.css — opacity/
@@ -661,9 +673,88 @@
     // the fault.
     if (!softSwap && pendingLanding !== "bottom") {
       var userInteracted = false;
-      ["pointerdown", "wheel", "touchstart", "keydown"].forEach(function (type) {
-        listen(window, type, function () { userInteracted = true; }, { once: true, passive: true });
-      });
+
+      // A page arrived at through the scroll transition is born in the
+      // middle of a gesture. On a trackpad the flick that brought the
+      // reader here keeps producing wheel events for a few hundred
+      // milliseconds after their fingers leave the surface, and those
+      // events land on this document — a document that had no part in
+      // the gesture and is showing its first project.
+      //
+      // With `scroll-snap-type: y mandatory` that leftover is not a
+      // nudge. Any displacement at all resolves to the next snap point,
+      // so the tail of the previous page's gesture costs the reader the
+      // whole first project: they arrive already looking at the second.
+      // It only shows going down the chain; arriving at a page's end
+      // from below (pendingLanding === "bottom") is handled above and
+      // never reaches this branch.
+      //
+      // Undoing the scroll afterwards is the wrong shape of fix — it
+      // fights mandatory snap, which re-resolves and fires another
+      // scroll, and the two take turns. The leftover is stopped at the
+      // door instead: while it is still arriving, the wheel events are
+      // taken non-passively and refused, so nothing scrolls at all and
+      // there is nothing to undo.
+      //
+      // Momentum and intent aren't distinguishable by event type — they
+      // are the same event — but they are by shape. Momentum is already
+      // in flight when the page loads and never pauses; a fresh gesture
+      // needs the reader to touch the pad again, and that touch arrives
+      // after a gap. So wheel events are refused only while they keep
+      // coming back to back, and the first one after a gap is let
+      // through as the reader's own, along with everything after it.
+      //
+      // Only for arrivals through the transition. A reader who clicked a
+      // keychain, or typed the address, owns every event that reaches
+      // this page from the first one — refusing anything there would be
+      // taking away a scroll they meant, to solve a problem they don't
+      // have.
+      var GESTURE_GAP_MS = 120;
+      // Nothing is held longer than this, however long the pad keeps
+      // coasting. A ceiling that is never reached in practice still has
+      // to exist, or a stuck stream of events could pin the page.
+      var GESTURE_CEILING_MS = 1200;
+      var arrivedAt = performance.now();
+      var lastWheelAt = arrivedAt;
+      var refusing = false;
+
+      function acceptIntent() {
+        refusing = false;
+        userInteracted = true;
+      }
+
+      if (pendingFromTransition) {
+        refusing = true;
+
+        listen(window, "wheel", function (e) {
+          if (!refusing) { userInteracted = true; return; }
+          var now = performance.now();
+          if (now - lastWheelAt > GESTURE_GAP_MS ||
+              now - arrivedAt > GESTURE_CEILING_MS) {
+            acceptIntent();
+            return; // theirs, not the previous page's — let it scroll
+          }
+          lastWheelAt = now;
+          e.preventDefault();
+        }, { passive: false });
+
+        // Anything the reader can only do deliberately ends the refusal
+        // outright: none of these can be left over from a gesture aimed
+        // at another page.
+        ["pointerdown", "touchstart", "keydown"].forEach(function (type) {
+          listen(window, type, acceptIntent, { once: true, passive: true });
+        });
+      } else {
+        // No refusal to run, so these stay passive: a non-passive wheel
+        // listener makes the browser wait on this handler before it can
+        // scroll, and that is a real cost to charge every reader for a
+        // situation only one kind of arrival is in.
+        ["pointerdown", "wheel", "touchstart", "keydown"].forEach(function (type) {
+          listen(window, type, function () { userInteracted = true; },
+                 { once: true, passive: true });
+        });
+      }
+
       var loadStamp = performance.now();
       var undidAutoScroll = false;
       window.addEventListener("scroll", function onEarlyAutoScroll() {
@@ -1196,6 +1287,8 @@
     pendingLanding =
       (options.landing || arrivalLanding) === "bottom" ? "bottom" : "top";
     arrivalLanding = null;
+    pendingFromTransition = arrivedByTransition;
+    arrivedByTransition = false;
     softSwap = !!options.softSwap;
 
     REVEAL_PAGE = document.body.classList.contains("project-reveal");
