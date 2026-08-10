@@ -7,7 +7,7 @@ this repository *are* the site.
 
 Double-click **`abrir-site.command`**.
 
-This matters, and is not the same as opening `home.html` directly. A page
+This matters, and is not the same as opening `index.html` directly. A page
 opened from the filesystem is treated by Chrome as its own isolated
 origin, and is not allowed to read the next page's document — which is
 what the scroll transition between categories depends on. Opened that
@@ -18,7 +18,7 @@ all. Published, the site is served anyway.
 ## Structure
 
 ```
-home.html              keychain cluster navigation
+index.html             keychain cluster navigation
 branding.html          10 projects
 social.html             5 projects
 webdesign.html          6 projects

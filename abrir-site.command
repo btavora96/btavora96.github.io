@@ -29,7 +29,7 @@ SERVIDOR=$!
 
 # Dá ao servidor um instante para ficar de pé antes de o browser bater à porta.
 sleep 1
-open "http://localhost:$PORTA/home.html"
+open "http://localhost:$PORTA/"
 
 trap 'kill $SERVIDOR 2>/dev/null' EXIT
 wait $SERVIDOR

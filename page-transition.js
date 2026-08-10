@@ -31,10 +31,23 @@
   "use strict";
 
   var CHAIN = {
-    "branding.html":  { prev: "home.html",      next: "social.html" },
+    "branding.html":  { prev: "index.html",     next: "social.html" },
     "social.html":    { prev: "branding.html",  next: "webdesign.html" },
-    "webdesign.html": { prev: "social.html",    next: "home.html" }
+    "webdesign.html": { prev: "social.html",    next: "index.html" }
   };
+
+  // Every page in this file is identified by its filename, because that
+  // is what a URL's last segment gives us. The home page is the one
+  // whose filename and whose address are not the same thing: a server
+  // answers a bare "/" with index.html, and "/" is what the canonical
+  // tag and every share of this site point at. So it is named
+  // index.html everywhere a page is compared or looked up, and turned
+  // into an address only at the single point where one is needed.
+  var ADDRESS = { "index.html": "./" };
+
+  function addressOf(key) {
+    return ADDRESS[key] || key;
+  }
 
   // What each strip says. Set as plain text rather than borrowing the
   // category's own scrolling banner: the strip is here to name where the
@@ -95,7 +108,7 @@
 
   function pageKey(pathname) {
     var last = pathname.split("/").pop();
-    return last || "home.html";
+    return last || "index.html";
   }
 
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -134,7 +147,7 @@
 
   var current = pageKey(location.pathname);
   var neighbours = CHAIN[current];
-  if (!neighbours) return; // other.html and home.html sit outside the chain
+  if (!neighbours) return; // other.html and the home page sit outside the chain
 
   if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     return; // leave ordinary link navigation to it
@@ -203,7 +216,7 @@
   var FRAMES_READABLE = null;
 
   function frameFor(href) {
-    if (!href || href === "home.html" || frames[href]) return;
+    if (!href || href === "index.html" || frames[href]) return;
     var frame = document.createElement("iframe");
     frame.className = "pt-source";
     frame.setAttribute("aria-hidden", "true");
@@ -276,7 +289,7 @@
 
   function warmFrom(href) {
     if (warmed[href]) return;
-    if (href === "home.html") {
+    if (href === "index.html") {
       warmed[href] = true;
       HOME_BACKDROP.forEach(function (src) {
         var warm = new Image();
@@ -514,7 +527,7 @@
     reveal = 0;
     revealTarget = 0;
 
-    var isHome = target === "home.html";
+    var isHome = target === "index.html";
 
     layerInner.innerHTML = "";
     layerInner.appendChild(isHome ? homePreview() : categoryPreview(target));
@@ -757,7 +770,7 @@
       // the frame's (see FRAMES_READABLE). The layer is covering the
       // viewport, so navigating outright lets the browser hold these
       // pixels for as long as it will.
-      window.location.href = href + arrivalFlag(wasDirection);
+      window.location.href = addressOf(href) + arrivalFlag(wasDirection);
     }, COMMIT_MS, easeOutCubic);
   }
 

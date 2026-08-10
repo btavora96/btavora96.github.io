@@ -33,7 +33,7 @@
   }
 
   // Reveal only once body's own CSS background-image (the full-bleed page
-  // photo on home.html; most pages don't set one) has actually decoded —
+  // photo on index.html; most pages don't set one) has actually decoded —
   // otherwise DOMContentLoaded fires first, the page fades in over a
   // plain background-color, and the photo pops in separately a moment
   // later instead of the page appearing whole.

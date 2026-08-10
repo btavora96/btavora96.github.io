@@ -28,7 +28,7 @@
     // href: null switches a tag off — it still hangs and swings, but the
     // click handler below returns early on a tag with nowhere to go.
     // Others is off until it has projects; put "other.html" back to
-    // restore it (see the note in home.html).
+    // restore it (see the note in index.html).
     { key: "star", file: "STAR-KC.webp", label: "Others — em breve", href: null },
     { key: "branding", file: "BRANDING-KC.webp", label: "Branding — ver projetos", href: "branding.html" },
     { key: "social", file: "SOCIAL-KC.webp", label: "Social Media — ver projetos", href: "social.html" }
@@ -279,7 +279,7 @@
     if (!host || host.dataset.kcInitialized) return;
     host.dataset.kcInitialized = "true";
 
-    // A page that cares about first-paint speed (home.html) can hand-write
+    // A page that cares about first-paint speed (index.html) can hand-write
     // the full markup up front — real <img> tags the browser's own parser/
     // preload scanner discovers immediately, instead of waiting on this
     // script to run after DOMContentLoaded to create them. When that

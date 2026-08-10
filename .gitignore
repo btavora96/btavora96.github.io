@@ -3,6 +3,7 @@
 
 # Local Claude Code settings (machine-specific)
 .claude/settings.local.json
+.claude/launch.json
 
 # Fonts and assets kept out of the shipped site — see README
 .attic/
