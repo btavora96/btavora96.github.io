@@ -671,9 +671,18 @@
     // else the watcher would just fight the deliberate position the
     // transition set, since "not at zero" is precisely what it treats as
     // the fault.
-    if (!softSwap && pendingLanding !== "bottom") {
-      var userInteracted = false;
+    // The transition hands a reader over in one of two ways, and which
+    // one happens is not a property of the site but of where it is
+    // served from: over file:// this document can't read the standby
+    // frame, so the handover is an ordinary navigation, and over http it
+    // can, so the next category's nodes are adopted live and no page
+    // loads at all. Both arrive mid-gesture. Only the second one was
+    // reachable in production, which is exactly the one an earlier fix
+    // here excluded.
+    var enteredByTransition = softSwap || pendingFromTransition;
+    var userInteracted = false;
 
+    if (enteredByTransition && pendingLanding !== "bottom") {
       // A page arrived at through the scroll transition is born in the
       // middle of a gesture. On a trackpad the flick that brought the
       // reader here keeps producing wheel events for a few hundred
@@ -716,44 +725,46 @@
       var GESTURE_CEILING_MS = 1200;
       var arrivedAt = performance.now();
       var lastWheelAt = arrivedAt;
-      var refusing = false;
+      var refusing = true;
 
       function acceptIntent() {
         refusing = false;
         userInteracted = true;
       }
 
-      if (pendingFromTransition) {
-        refusing = true;
+      listen(window, "wheel", function (e) {
+        if (!refusing) { userInteracted = true; return; }
+        var now = performance.now();
+        if (now - lastWheelAt > GESTURE_GAP_MS ||
+            now - arrivedAt > GESTURE_CEILING_MS) {
+          acceptIntent();
+          return; // theirs, not the previous page's — let it scroll
+        }
+        lastWheelAt = now;
+        e.preventDefault();
+      }, { passive: false });
 
-        listen(window, "wheel", function (e) {
-          if (!refusing) { userInteracted = true; return; }
-          var now = performance.now();
-          if (now - lastWheelAt > GESTURE_GAP_MS ||
-              now - arrivedAt > GESTURE_CEILING_MS) {
-            acceptIntent();
-            return; // theirs, not the previous page's — let it scroll
-          }
-          lastWheelAt = now;
-          e.preventDefault();
-        }, { passive: false });
+      // Anything the reader can only do deliberately ends the refusal
+      // outright: none of these can be left over from a gesture aimed
+      // at another page.
+      ["pointerdown", "touchstart", "keydown"].forEach(function (type) {
+        listen(window, type, acceptIntent, { once: true, passive: true });
+      });
+    } else {
+      // No refusal to run, so these stay passive: a non-passive wheel
+      // listener makes the browser wait on this handler before it can
+      // scroll, and that is a real cost to charge every reader for a
+      // situation only one kind of arrival is in.
+      ["pointerdown", "wheel", "touchstart", "keydown"].forEach(function (type) {
+        listen(window, type, function () { userInteracted = true; },
+               { once: true, passive: true });
+      });
+    }
 
-        // Anything the reader can only do deliberately ends the refusal
-        // outright: none of these can be left over from a gesture aimed
-        // at another page.
-        ["pointerdown", "touchstart", "keydown"].forEach(function (type) {
-          listen(window, type, acceptIntent, { once: true, passive: true });
-        });
-      } else {
-        // No refusal to run, so these stay passive: a non-passive wheel
-        // listener makes the browser wait on this handler before it can
-        // scroll, and that is a real cost to charge every reader for a
-        // situation only one kind of arrival is in.
-        ["pointerdown", "wheel", "touchstart", "keydown"].forEach(function (type) {
-          listen(window, type, function () { userInteracted = true; },
-                 { once: true, passive: true });
-        });
-      }
+    // Separate question, and still only a fresh document's: the browser
+    // re-resolving mandatory snap a beat after parsing. A swap has no
+    // parse to go wrong, so it is not in scope here.
+    if (!softSwap && pendingLanding !== "bottom") {
 
       var loadStamp = performance.now();
       var undidAutoScroll = false;
