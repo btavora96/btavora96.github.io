@@ -709,6 +709,37 @@
     var easeStep = EASE;
     var slideEaseStep;
 
+    // The floating button follows the active project's middle rather
+    // than being placed at it. Assigned outright, it steps from one
+    // project's centre to the next's in a single frame the instant focus
+    // changes hands — a jump of most of the screen, which is what read
+    // as it snapping between images. Chased instead, it travels. Slower
+    // than the focus effect on purpose: it is one small object crossing
+    // a distance, and the eye follows it the whole way.
+    var FLOAT_EASE = 0.09;
+    var floatEaseStep = FLOAT_EASE;
+    var floatTop = null;
+
+    // A ceiling on how fast it may travel, in pixels per second.
+    //
+    // Chasing alone isn't enough on its own: an exponential chase moves
+    // fastest exactly when the gap is widest, so the moment the button
+    // changes projects — a gap of most of the screen — it lunges, and
+    // only becomes graceful once it is nearly there. That is a jump with
+    // a soft landing, not a glide. Capping the speed makes the long
+    // journeys even, and leaves the chase to do what it is good at:
+    // easing out the last stretch so it never stops dead.
+    var FLOAT_MAX_PX_PER_S = 950;
+
+    // How much more in focus a project must be than the one currently
+    // holding the button before it takes it over. See the handover in
+    // the loop below.
+    var HANDOVER_MARGIN = 0.08;
+
+    // The elapsed time of the frame being drawn, so the speed cap can be
+    // expressed per second rather than per frame.
+    var frameDt = 1 / 60;
+
     // After a swap, land on the focus values rather than easing into
     // them. The loop normally chases its targets over about half a
     // second, which is what gives the gallery its weight while
@@ -898,8 +929,21 @@
       }
       centre = clamp(centre, bannerHeight + margin, vh - margin);
 
-      if (floatingBtn) floatingBtn.style.top = centre.toFixed(1) + "px";
-      if (floatingPanel) floatingPanel.style.top = centre.toFixed(1) + "px";
+      // First placement lands where it belongs; every one after that is
+      // travelled to — eased, and never faster than the cap.
+      if (floatTop === null) {
+        floatTop = centre;
+      } else {
+        var step = (centre - floatTop) * floatEaseStep;
+        var cap = FLOAT_MAX_PX_PER_S * frameDt;
+        if (step > cap) step = cap;
+        else if (step < -cap) step = -cap;
+        floatTop += step;
+      }
+
+      var y = floatTop.toFixed(1) + "px";
+      if (floatingBtn) floatingBtn.style.top = y;
+      if (floatingPanel) floatingPanel.style.top = y;
     }
 
     function updateFloatingLabel() {
@@ -913,29 +957,36 @@
 
     function setActiveEntry(nextEntry) {
       if (nextEntry === activeEntry) return;
-      var hadPrevious = !!activeEntry;
+      var wasOpen = panelOpen;
       revealToken++;
       var myToken = revealToken;
 
-      // Fade the current project's button/panel out (and reset open —
-      // each project starts fresh) immediately; the *next* one only
-      // fades in once that's had time to finish, so the two never
-      // cross-fade into a confusing double-visible state.
-      if (floatingBtn) floatingBtn.classList.remove("is-visible", "is-open");
+      // The panel belongs to one project and has to close. The button
+      // does not: it is the same bare "+" for every project, and fading
+      // it out only to fade the identical thing back in a third of a
+      // second later is a blink with nothing behind it. That — together
+      // with the jump it made while invisible — is what read as it
+      // snapping between images. It stays lit and travels instead.
+      if (floatingBtn) floatingBtn.classList.remove("is-open");
       if (floatingPanel) floatingPanel.classList.remove("is-open");
       panelOpen = false;
       activeEntry = nextEntry;
 
-      window.setTimeout(function () {
-        if (myToken !== revealToken) return; // superseded by a later scroll
-        if (activeEntry) {
-          if (floatingPanelTitle) floatingPanelTitle.textContent = activeEntry.label || "";
-          if (floatingPanelText) floatingPanelText.textContent = activeEntry.description || "";
-          updateFloatingHorizontal();
-        }
-        if (floatingBtn) floatingBtn.classList.toggle("is-visible", !!activeEntry);
-        updateFloatingLabel();
-      }, hadPrevious ? REVEAL_SWAP_MS : 0);
+      if (floatingBtn) floatingBtn.classList.toggle("is-visible", !!activeEntry);
+      updateFloatingLabel();
+      if (activeEntry) updateFloatingHorizontal();
+
+      // The panel's words *do* change hands, and swapping them while the
+      // card is still fading out would show the incoming project's text
+      // inside the outgoing project's card. That one wait is still worth
+      // having — but only when there was an open card to wait for.
+      function swapText() {
+        if (myToken !== revealToken || !activeEntry) return;
+        if (floatingPanelTitle) floatingPanelTitle.textContent = activeEntry.label || "";
+        if (floatingPanelText) floatingPanelText.textContent = activeEntry.description || "";
+      }
+      if (wasOpen) window.setTimeout(swapText, REVEAL_SWAP_MS);
+      else swapText();
     }
 
     if (floatingBtn) {
@@ -976,8 +1027,10 @@
       // doesn't resolve everything in a single jarring frame.
       var dt = Math.min((frameNow - lastFrameAt) / 1000, 0.05);
       lastFrameAt = frameNow;
+      frameDt = dt;
       easeStep = easeAmount(EASE, dt);
       slideEaseStep = easeAmount(SLIDE_EASE, dt);
+      floatEaseStep = easeAmount(FLOAT_EASE, dt);
 
       if (galleryPaused) {
         requestAnimationFrame(tick);
@@ -990,6 +1043,7 @@
       if (seedFocus) {
         easeStep = 1;
         slideEaseStep = 1;
+        floatEaseStep = 1;
         seedFocus = false;
       }
 
@@ -1012,8 +1066,18 @@
         var focus = targets.focus;
         var yTarget = targets.y;
 
-        if (focus > bestFocus) {
-          bestFocus = focus;
+        // The project already holding the button gets a head start.
+        // Without one, whichever project is a hair's breadth more in
+        // focus wins outright — and around the midpoint between two, the
+        // smallest movement of the wheel keeps handing the title back
+        // and forth. Each of those handovers throws the button's target
+        // most of a screen, so an almost imperceptible scroll produced a
+        // very perceptible lurch. It now takes a clear lead to take
+        // over, which is what makes the whole thing feel less twitchy
+        // under the hand.
+        var weight = focus + (entry === activeEntry ? HANDOVER_MARGIN : 0);
+        if (weight > bestFocus) {
+          bestFocus = weight;
           bestEntry = entry;
           bestRect = rect;
         }
