@@ -111,9 +111,17 @@ body {
    hero's entrance swing has settled — so the text only breathes in once
    the object it's introducing feels stable, instead of appearing at the
    same time as everything else. */
+/* One colour for everything in these two blocks, and it is the exact
+   background of the category pages — so the words that introduce the
+   work are already the colour of the ground the work sits on. Stated
+   here rather than on each piece of text: heading, paragraphs, button
+   and subtitle were each carrying their own value, some of them at
+   different opacities, which is why they read as slightly different
+   colours from one another. */
 .info-box {
   position: fixed;
   z-index: 40;
+  color: #ececee;
   max-width: min(26rem, calc(100vw - 4rem));
   opacity: 0;
   transform: translateY(10px);
@@ -156,7 +164,6 @@ body.kc-settled .contact-box {
   margin: 0 0 1.1rem;
   font-size: 0.95rem;
   line-height: 1.65;
-  color: rgba(242, 242, 247, 0.85);
 }
 
 .hello-box p:last-child {
@@ -176,9 +183,15 @@ body.kc-settled .contact-box {
   display: inline-flex;
   align-items: center;
   padding: 0.55rem 1.1rem;
-  border: 1.3px solid #f2f2f7;
+  /* An anchor doesn't inherit colour on its own — the browser's own
+     stylesheet gives every link its default blue, and that beats
+     anything inherited from an ancestor. Said explicitly here, or the
+     button and its ring both come out blue. */
+  color: inherit;
+  /* currentColor, so the ring can never drift from the word inside it. */
+  border: 1.3px solid currentColor;
   border-radius: 999px;
-  background-color: rgba(242, 242, 247, 0);
+  background-color: rgba(236, 236, 238, 0);
   text-decoration: none;
   cursor: pointer;
   transform: scale(1);
@@ -190,7 +203,7 @@ body.kc-settled .contact-box {
 .contact-button:hover,
 .contact-button:focus-visible {
   transform: scale(1.035);
-  background-color: rgba(242, 242, 247, 0.08);
+  background-color: rgba(236, 236, 238, 0.08);
 }
 
 .contact-button:active {
@@ -214,7 +227,6 @@ body.kc-settled .contact-box {
   font-size: 0.8rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: #f2f2f7;
   transition: font-weight 0.25s ease;
 }
 
@@ -226,7 +238,6 @@ body.kc-settled .contact-box {
 .contact-subtitle {
   margin: 0;
   font-size: 0.85rem;
-  color: rgba(242, 242, 247, 0.75);
   text-align: right;
 }
 
