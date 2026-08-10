@@ -37,8 +37,4 @@ html.pt-arrival body.page-ready {
     transition: none;
   }
 
-  html.pt-arrival .project-grid {
-    transform: none;
-    transition: none;
-  }
 }

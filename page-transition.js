@@ -47,27 +47,9 @@
     "webdesign.html": "Web Design"
   };
 
-  // The pictures each page opens with, in order. Warmed while the strip
-  // is docked — a gesture's worth of time before they are needed — so
-  // the destination arrives with its first screen already decoded
-  // instead of assembling itself while the reader watches. Nothing waits
-  // on these: if one hasn't landed by the time the page does, the page
-  // goes ahead without it. Should this ever fall out of step with the
-  // markup the request simply misses and nothing else changes.
-  var FIRST_IMAGES = {
-    "branding.html": [
-      "assets/branding/aurora-skincare.webp",
-      "assets/branding/cascais-ópera.webp",
-      "assets/branding/crafthouse-coffee.webp"
-    ],
-    "social.html": [
-      "assets/social/estoril-riviera.webp",
-      "assets/social/rud-jewelry.webp"
-    ],
-    "webdesign.html": [
-      "assets/webdesign/361-retail.webp"
-    ]
-  };
+  // How many of a page's pictures count as its opening screen — the ones
+  // whose absence would be seen. See warmFrom.
+  var FIRST_SCREEN_IMAGES = 5;
 
   // The reveal happens in two acts rather than one long drag.
   //
@@ -106,7 +88,7 @@
   var AUTO_STEP_AT = 0.62;
   var SETTLE_MS = 760;
   var COMMIT_MS = 420;      // the final rise, kept short — see commit()
-  var LAYER_DISSOLVE_MS = 260; // must match .pt-layer.is-dissolving
+  var LAYER_DISSOLVE_MS = 460; // must match .pt-layer.is-dissolving
   // px/ms of sustained push that completes regardless of distance.
   var FLICK_VELOCITY = 1.1;
   var VELOCITY_WINDOW_MS = 110;
@@ -209,6 +191,16 @@
   // page to hand over, instead of a navigation and the second or so it
   // takes a browser to build a document from nothing.
   var frames = {};
+  var loaded = {};
+
+  // Whether this browser lets this document read the frame's. It is not
+  // a given: a file:// page is its own opaque origin, and depending on
+  // how the browser was started, reaching into a sibling file's document
+  // may be refused outright. Where it is refused there is no swap to be
+  // had and the frame is only priming the cache for the navigation that
+  // must happen instead — still worth keeping, just not worth waiting
+  // on. null until a frame has actually loaded and been asked.
+  var FRAMES_READABLE = null;
 
   function frameFor(href) {
     if (!href || href === "home.html" || frames[href]) return;
@@ -218,16 +210,11 @@
     frame.setAttribute("tabindex", "-1");
     frame.src = href + "?" + PREVIEW_FLAG;
     frame.addEventListener("load", function () {
-      // visibility:hidden lays out but doesn't paint, and an image that
-      // is never painted may never be decoded — which would put the
-      // decode back at the moment of the swap, exactly where a blank
-      // frame comes from. Asking for it explicitly settles that.
-      var doc = frameDoc(href);
-      if (!doc) return;
-      Array.prototype.slice.call(doc.querySelectorAll("img"), 0, 4)
-        .forEach(function (img) {
-          if (img.decode) img.decode().catch(function () {});
-        });
+      loaded[href] = true;
+      // Settle the question the moment there is something to ask it of,
+      // rather than at the one instant that can't afford the answer.
+      if (FRAMES_READABLE === null) FRAMES_READABLE = !!frameDoc(href);
+      warmFrom(href);
     });
     document.body.appendChild(frame);
     frames[href] = frame;
@@ -246,9 +233,90 @@
     return doc;
   }
 
+  // Decoding the destination's opening screen *in this document*.
+  //
+  // The frame is hidden, and a browser doesn't decode images it is never
+  // going to paint — it throttles rendering in frames nobody can see,
+  // which is the whole reason keeping one costs so little. So the
+  // pictures were arriving loaded but not decoded, and the decode landed
+  // at the moment of the swap: the page changed, and then sat there as
+  // bare ground while several full-width images were worked out. That is
+  // the delay, and it is not in the navigation at all.
+  //
+  // Asking for them here, against this document, puts the decoded frames
+  // in the cache the adopted <img> elements will draw from. Read off the
+  // frame rather than a list kept by hand, so it can't drift from what
+  // the page actually shows.
+  var warmed = {};
+
+  // Home can't be kept in a frame — it has its own stylesheet and its
+  // own simulation, and reaching it is a real navigation. What it can
+  // have is its ground already in the cache when it gets there: its
+  // backdrop is a two-megabyte photograph, and a browser that has to
+  // fetch and decode that after the navigation leaves the reader looking
+  // at the layer's dark field for exactly as long as it takes. Read from
+  // page.css, which is not ours to change but is ours to keep up with.
+  var HOME_BACKDROP = ["assets/page-bg.webp", "assets/grain.svg"];
+
+  // Used only where the frame can't be read — see warmFrom.
+  var FALLBACK_IMAGES = {
+    "branding.html": [
+      "assets/branding/aurora-skincare.webp",
+      "assets/branding/cascais-ópera.webp",
+      "assets/branding/crafthouse-coffee.webp"
+    ],
+    "social.html": [
+      "assets/social/estoril-riviera.webp",
+      "assets/social/rud-jewelry.webp"
+    ],
+    "webdesign.html": [
+      "assets/webdesign/361-retail.webp"
+    ]
+  };
+
+  function warmFrom(href) {
+    if (warmed[href]) return;
+    if (href === "home.html") {
+      warmed[href] = true;
+      HOME_BACKDROP.forEach(function (src) {
+        var warm = new Image();
+        warm.src = src;
+        if (warm.decode) warm.decode().catch(function () {});
+      });
+      return;
+    }
+    var doc = frameDoc(href);
+    var list;
+    if (doc) {
+      list = Array.prototype.slice
+        .call(doc.querySelectorAll(".gallery-item img"), 0, FIRST_SCREEN_IMAGES)
+        .map(function (img) { return img.getAttribute("src"); });
+    } else {
+      if (!loaded[href]) return; // still coming; there will be another chance
+      // The frame loaded and still can't be read, so the page's own
+      // markup is out of reach and the opening pictures have to be named
+      // here. Warming them is what stops the navigation that follows
+      // from landing on bare ground. A name that drifts out of step with
+      // the markup simply misses, and nothing else changes.
+      list = FALLBACK_IMAGES[href] || [];
+    }
+    warmed[href] = true;
+    list.forEach(function (src) {
+      if (!src) return;
+      var warm = new Image();
+      warm.src = src;
+      if (warm.decode) warm.decode().catch(function () {});
+    });
+  }
+
   function prepareNeighbours() {
     frameFor(neighbours.next);
     frameFor(neighbours.prev);
+    // A frame built earlier may have finished loading before anything
+    // asked it to warm — or been kept across a swap, where its load
+    // event is long past.
+    warmFrom(neighbours.next);
+    warmFrom(neighbours.prev);
   }
 
   // As soon as this page has finished loading, and not a moment later.
@@ -266,28 +334,14 @@
     if (href && !frames[href]) frameFor(href);
   }
 
-  // A frame that hasn't finished loading is worth a short wait. What the
-  // reader is looking at meanwhile is the layer, covering the viewport
-  // in the destination's own ground — still, continuous, and the right
-  // colour. Navigating instead would replace that with the browser's
-  // blank. Waiting is the lesser evil; in practice neither happens,
-  // because the frame has been loading since this page finished.
-  var FRAME_WAIT_MS = 1200;
-
-  function whenFrameReady(href, cb) {
-    var doc = frameDoc(href);
-    if (doc) return cb(doc);
-    var frame = frames[href];
-    if (!frame) return cb(null);
-    var settled = false;
-    function done() {
-      if (settled) return;
-      settled = true;
-      cb(frameDoc(href));
-    }
-    frame.addEventListener("load", done, { once: true });
-    window.setTimeout(done, FRAME_WAIT_MS);
-  }
+  // No waiting, ever. This used to hold on for up to a second and a
+  // fifth if the frame wasn't ready, on the reasoning that a still,
+  // correctly-coloured field beats the browser's blank. It doesn't: a
+  // held field with a label sitting on it is the most conspicuous
+  // possible way to do nothing, and it reads as the page having got
+  // stuck. Either the next page is standing by, in which case this is
+  // instant, or it isn't, in which case going and fetching it starts
+  // now rather than a second from now.
 
   // --------------------------------------------------------------- state
 
@@ -641,11 +695,8 @@
 
       // Resting here is the one unhurried moment in the whole movement,
       // and it is immediately before the moment that can least afford to
-      // wait. Spend it on the pictures the destination opens with.
-      (FIRST_IMAGES[target] || []).forEach(function (src) {
-        var warm = new Image();
-        warm.src = src;
-      });
+      // wait. Last chance to have the destination's pictures decoded.
+      warmFrom(target);
     });
   }
 
@@ -675,18 +726,17 @@
     // trails off: the label fades out across the same stretch, so what
     // lands at the top is clean ground with nothing to replace.
     animateTo(1, function () {
-      whenFrameReady(href, function (doc) {
-        if (doc) {
-          swapTo(href, doc, wasDirection);
-          return;
-        }
-        // Nothing standing by at all — the destination is Home, which
-        // has its own stylesheet and its own simulation and is not
-        // something to graft into a category page. The layer is covering
-        // the viewport, so navigating outright lets the browser hold
-        // these pixels for as long as it will.
-        window.location.href = href + arrivalFlag(wasDirection);
-      });
+      var doc = frameDoc(href);
+      if (doc) {
+        swapTo(href, doc, wasDirection);
+        return;
+      }
+      // Nothing standing by: Home, which can't be grafted into a
+      // category page; or a browser that won't let this document read
+      // the frame's (see FRAMES_READABLE). The layer is covering the
+      // viewport, so navigating outright lets the browser hold these
+      // pixels for as long as it will.
+      window.location.href = href + arrivalFlag(wasDirection);
     }, COMMIT_MS, easeOutCubic);
   }
 
@@ -724,14 +774,18 @@
     // just left is the one behind the new one, and rebuilding a frame
     // that is already loaded would put a real navigation back in reach
     // for no reason at all.
-    if (frames[href]) {
-      frames[href].remove();
-      delete frames[href];
-    }
-    Object.keys(frames).forEach(function (key) {
-      if (key === neighbours.prev || key === neighbours.next) return;
+    function dropFrame(key) {
       frames[key].remove();
       delete frames[key];
+      // A rebuilt frame is a new document, and its pictures will need
+      // asking for again.
+      delete warmed[key];
+      delete loaded[key];
+    }
+    if (frames[href]) dropFrame(href);
+    Object.keys(frames).forEach(function (key) {
+      if (key === neighbours.prev || key === neighbours.next) return;
+      dropFrame(key);
     });
 
     // Everything that was dressing the *outgoing* page stops now: the
@@ -747,7 +801,18 @@
     // to wait out a fade to keep scrolling — while the layer dissolves
     // off the page it is now merely covering.
     reset();
-    layer.classList.add("is-dissolving");
+
+    // Set the new page up *before* starting the dissolve, not after.
+    // This measures every project, resolves the snap alignment and puts
+    // the page at its landing position — a solid piece of work, and done
+    // after the class is set it lands between the transition starting
+    // and its first drawn frame. Which is a stutter, right at the moment
+    // the whole movement is meant to be at its smoothest.
+    window.initCategoryPage({
+      landing: wasDirection === "prev" ? "bottom" : "top",
+      softSwap: true
+    });
+    if (window.galleryScrollControl) window.galleryScrollControl.resume();
 
     // Belt and braces, because the failure here is not cosmetic: a layer
     // left dissolved is invisible but still covering the viewport, and
@@ -762,14 +827,35 @@
       layer.classList.remove("is-dissolving");
       clearVisuals();
     }
-    layer.addEventListener("transitionend", finishDissolve, { once: true });
-    window.setTimeout(finishDissolve, LAYER_DISSOLVE_MS + 120);
 
-    window.initCategoryPage({
-      landing: wasDirection === "prev" ? "bottom" : "top",
-      softSwap: true
+    // Start the dissolve only once the page underneath has actually been
+    // drawn once.
+    //
+    // A CSS transition is clocked from the moment the style change is
+    // committed, not from the moment it is first painted. Everything
+    // above — adopting a whole gallery, measuring it, resolving its snap
+    // alignment — is a substantial piece of layout, and starting the
+    // fade before the browser has worked through it means the first
+    // frame the reader actually sees is already some way down the curve.
+    // The layer jumps to that opacity and fades from there: a blink, and
+    // then a dissolve. Two frames of patience and the whole 460ms is
+    // there to be seen.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        if (finished) return; // a new gesture got here first
+        layer.classList.add("is-dissolving");
+
+        // transitionend bubbles. The label inside fades on its own,
+        // shorter curve, and its event would otherwise arrive first and
+        // tear the layer away less than halfway through its own
+        // dissolve — so only the layer's own opacity ends this.
+        layer.addEventListener("transitionend", function (e) {
+          if (e.target !== layer || e.propertyName !== "opacity") return;
+          finishDissolve();
+        });
+        window.setTimeout(finishDissolve, LAYER_DISSOLVE_MS + 120);
+      });
     });
-    if (window.galleryScrollControl) window.galleryScrollControl.resume();
 
     prepareNeighbours();
   }
@@ -923,6 +1009,21 @@
   window.addEventListener("popstate", function () {
     window.location.reload();
   });
+
+  // Whether the seamless path is available at all comes down to a
+  // browser policy this page can't see from the outside, and the two
+  // outcomes look quite different to read. Left here so the question can
+  // be answered from the console in one line instead of inferred.
+  window.__ptStatus = function () {
+    return {
+      protocol: location.protocol,
+      framesReadable: FRAMES_READABLE,
+      frames: Object.keys(frames).map(function (k) {
+        return k + (loaded[k] ? " (loaded)" : " (loading)") +
+          (frameDoc(k) ? " readable" : " unreadable");
+      })
+    };
+  };
 
   window.addEventListener("pageshow", function (e) {
     if (e.persisted) {

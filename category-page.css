@@ -812,11 +812,35 @@ body {
   /* It is already only scenery by this point, and the live page is
      underneath it — nothing here should be catching a click. */
   pointer-events: none;
-  transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  /* Composite the fade rather than repainting a full-viewport surface
+     against a gallery on every frame of it. This is the one property
+     changing, and saying so is what keeps the curve smooth. */
+  will-change: opacity;
+  /* Evenly, not on the site's usual motion curve. That curve is right
+     for things that travel — fast away, settling long — but applied to
+     a crossfade it spends two thirds of the opacity in the first fifth
+     of the time: the layer is effectively gone in a tenth of a second
+     and the remaining three hundred milliseconds are a tail nobody can
+     see. Which is a blink followed by nothing, not a dissolve. The eye
+     reads opacity more or less linearly, so this is close to linear,
+     eased only at the two ends to keep it from starting or stopping
+     abruptly. */
+  transition: opacity 460ms cubic-bezier(0.37, 0, 0.63, 1);
+}
+
+/* The name goes before the ground it sits on. Fading them together
+   would hold sharp black type over the artwork for the whole dissolve,
+   which is the one element with enough contrast to stay legible right
+   to the end and so the one that would read as lingering. Gone early,
+   what is left to dissolve is a plain field over a finished page. */
+.pt-layer.is-dissolving .pt-strip-label {
+  opacity: 0;
+  transition: opacity 240ms cubic-bezier(0.37, 0, 0.63, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pt-layer.is-dissolving {
+  .pt-layer.is-dissolving,
+  .pt-layer.is-dissolving .pt-strip-label {
     transition: none;
   }
 }
@@ -855,19 +879,13 @@ body {
    The travel is longer than the fade on purpose. The page is legible
    well before it stops moving, so the tail is felt rather than waited
    on, which is the difference between a settle and a delay. */
-html.pt-arrival .project-grid {
-  transform: translate3d(0, 14px, 0);
-  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* Ends at `none`, not at a zeroed translate. An identity transform is
-   still a transform: it would leave the gallery a containing block and
-   a stacking context, and hold a composited layer open, for the whole
-   life of a page that has finished moving. `none` interpolates from a
-   translate exactly the same way. */
-html.pt-arrival body.page-ready .project-grid {
-  transform: none;
-}
+/* The gallery used to drift the last few pixels up as it faded in here.
+   It read well in isolation and it was the wrong thing on the one path
+   that needs to feel quickest: this rule only ever applies where a real
+   navigation happened, which is precisely where the reader has already
+   waited for a document to be built. Adding four tenths of a second of
+   travel on top of that is decorating the slow route. The fade alone
+   now, and it lands sooner. */
 
 /* The next page, loaded and standing by to be adopted (see frameFor in
    page-transition.js). Never shown — but sized to the real viewport,
@@ -932,19 +950,14 @@ html.pt-arrival body.page-ready .project-grid {
   background: #17140f;
 }
 
-/* Fades out over the last stretch of the rise, driven by the same
-   progress value that moves the layer — so it is tied to the movement
-   rather than timed against it, and can't fall out of step.
-
-   Its job is done the moment the strip reaches the top: it named where
-   the reader was going, and they have arrived. Left up, it would still
-   be sitting there while the browser fetches the page, and then be
-   replaced by that page's own banner — which is the pause that reads as
-   the next page being slow. Gone by the time it lands, what the page
-   arrives onto is clean ground with nothing to displace.
-
-   opacity clamps to [0,1], so the multiplier just means "fully visible
-   until the last fifth". */
+/* Deliberately *not* faded out during the rise. It used to be, on the
+   reasoning that its job was done once it reached the top — but that
+   left a stretch with the label already gone and the page not yet
+   uncovered, which is nothing at all on screen: a flat field, holding.
+   Short as it was, that hold was the most conspicuous thing in the
+   whole movement, because it was the only moment nothing was happening.
+   The label now stays up until the swap and leaves with the layer that
+   carries it, so the page underneath is arriving in the same breath. */
 .pt-strip-label {
   margin: 0;
   font-family: "Ouma Devanagari", sans-serif;
@@ -955,7 +968,6 @@ html.pt-arrival body.page-ready .project-grid {
   text-align: center;
   line-height: 1.4;
   color: #1a1a1a;
-  opacity: calc((1 - var(--pt-progress, 0)) * 5);
 }
 
 .pt-preview-home .pt-strip-label {
