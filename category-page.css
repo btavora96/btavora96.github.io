@@ -817,30 +817,6 @@ body {
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0));
 }
 
-/* Preview frames, used when the site is opened straight from disk and
-   the next page therefore can't be read (see CAN_READ_PAGES in
-   page-transition.js). They hold the genuine page, so what rises is the
-   real thing; they're built once and kept, because reinserting an
-   iframe makes it reload. */
-.pt-frames {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.pt-frame {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border: 0;
-  display: none;
-}
-
-.pt-frame.is-showing {
-  display: block;
-}
-
 .pt-layer-inner {
   position: relative;
   width: 100%;
@@ -855,11 +831,11 @@ body {
 /* Home is previewed rather than injected — it has its own stylesheet
    that restyles body wholesale. This borrows its warm charcoal so the
    edge that appears belongs unmistakably to that page. */
-/* Stand-in for a category whose markup couldn't be fetched — opening
-   the site straight off disk is the usual reason, since browsers block
-   fetch() on file:// URLs. It carries that category's real banner, so
-   the gesture is identical; only the hand-off at the end falls back to
-   a fade. See bannerPreview in page-transition.js. */
+/* The surface that rises during a category transition: the destination
+   announced by its own banner, over the same background the page it
+   stands for will arrive on — so the hand-off at the end is the artwork
+   appearing, not the ground changing colour underneath it. See
+   categoryPreview in page-transition.js. */
 .pt-page-preview {
   position: absolute;
   inset: 0;
@@ -884,16 +860,39 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 1.5rem;
   background: #17140f;
 }
 
+/* Where a category strip carries a name, this one carries a sentence,
+   so it is set smaller and tracked tighter — enough to stay on one line
+   at ordinary widths without losing the banner's spaced-out voice. */
 .pt-home-label {
+  margin: 0;
   font-family: "Ouma Devanagari", sans-serif;
   font-weight: 400;
-  font-size: 1.1rem;
-  letter-spacing: 0.3em;
+  font-size: clamp(0.58rem, 1.35vw, 0.9rem);
+  letter-spacing: 0.16em;
   text-transform: uppercase;
+  text-align: center;
+  line-height: 1.4;
   color: rgba(255, 255, 255, 0.92);
+}
+
+/* The one thing on this strip that can be acted on, so it is the one
+   thing marked. Underlined rather than coloured: the strip has no
+   palette to spend, and an underline reads as a link at any size. */
+.pt-home-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 0.35em;
+  text-decoration-thickness: 1px;
+  transition: opacity 0.3s ease;
+}
+
+.pt-home-link:hover,
+.pt-home-link:focus-visible {
+  opacity: 0.65;
 }
 
 .project-cta {

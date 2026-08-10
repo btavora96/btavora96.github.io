@@ -74,18 +74,14 @@
     ":scope > .gallery-media > img, :scope > .gallery-media > .gallery-video, " +
     ":scope > .gallery-media > .gallery-frame-wrap";
 
-  // Set by initCategoryPage: where this run should settle, and whether
-  // it was reached by a soft swap rather than a real page load.
+  // Where this run should settle.
   var pendingLanding = "top";
-  var softSwap = false;
 
   // Scrolling *up* out of the top of a category walks back into the
   // previous one, and what the reader was shown during that gesture was
-  // that page's end. When the hand-off has to go through a real
-  // navigation (see page-transition.js), this is how that lands here:
-  // read once, synchronously, because transition.js strips the flag off
-  // the URL as soon as the page has settled. One-shot — a later soft
-  // swap says where it wants to land itself.
+  // that page's end. This is how that lands here: read once,
+  // synchronously, because transition.js strips the flag off the URL as
+  // soon as the page has settled.
   var arrivalLanding =
     /(^|#)pt-in=bottom(&|$)/.test(location.hash) ? "bottom" : null;
 
@@ -646,13 +642,12 @@
     // not a real one, and gets undone once. A genuine user scroll
     // (flagged the moment any input starts) is never touched.
     //
-    // Skipped whenever a landing position was chosen for us — after a
-    // soft swap, or on arriving at a page's end from the one below it.
-    // The quirk this corrects belongs to parsing a fresh document at the
-    // top; anywhere else the watcher would just fight the deliberate
-    // position the transition set, since "not at zero" is precisely what
-    // it treats as the fault.
-    if (!softSwap && pendingLanding !== "bottom") {
+    // Skipped when a landing position was chosen for us — arriving at a
+    // page's end from the one below it. The quirk this corrects belongs
+    // to parsing a fresh document at the top; anywhere else the watcher
+    // would just fight the deliberate position the transition set, since
+    // "not at zero" is precisely what it treats as the fault.
+    if (pendingLanding !== "bottom") {
       var userInteracted = false;
       ["pointerdown", "wheel", "touchstart", "keydown"].forEach(function (type) {
         listen(window, type, function () { userInteracted = true; }, { once: true, passive: true });
@@ -698,7 +693,6 @@
     // 0.19: a longer tail is what reads as gliding rather than tracking.
     var EASE = 0.12;
 
-    var seedFocus = softSwap;
     var lastFrameAt = performance.now();
     var easeStep = EASE;
     var slideEaseStep;
@@ -721,12 +715,8 @@
     // scaled up and glowing underneath them.
     var EXIT_RELEASE_PX = 420;
 
-    // The shape of the focus effect, in one place. tick() eases toward
-    // these values frame by frame; applySettledFocus below assigns them
-    // outright. `top` and `height` are measured against whatever counts
-    // as the viewport for the caller — the real one for the live page,
-    // the transition layer's own box for a page being previewed inside
-    // it.
+    // The shape of the focus effect, in one place: tick() eases toward
+    // these values frame by frame.
     function focusTargetsFor(top, height, vh, isTall, startAligned) {
       if (isTall) {
         // Two-stop pieces: focus ramps up as the artwork's own top edge
@@ -781,33 +771,6 @@
       s.setProperty("--gf-shadow-blur", v.shadowBlur.toFixed(1) + "px");
       s.setProperty("--gf-shadow-alpha", v.shadowAlpha.toFixed(3));
     }
-
-    // Dresses a copy of another page — the one page-transition.js is
-    // holding in its layer — as it will look once it lands, treating
-    // that layer's own box as the viewport.
-    //
-    // Without this the layer shows every project equally sharp and
-    // equally sized, which is already unlike the rest of the site; and
-    // the instant it becomes the page, the loop starts from those flat
-    // defaults and eases each image into its own focus state. That
-    // settling is per-image, so it reads as the new page's contents
-    // arriving one by one rather than as a single surface — however
-    // rigidly the surface itself moved.
-    window.applySettledFocus = function (root) {
-      if (!root) return;
-      var vh = window.innerHeight;
-      var originTop = root.getBoundingClientRect().top;
-      var items = root.querySelectorAll(".gallery-item");
-      Array.prototype.forEach.call(items, function (item, index) {
-        var media = item.querySelector(MEDIA_SELECTOR);
-        if (!media) return;
-        var r = media.getBoundingClientRect();
-        var isTall = r.height > vh * TALL_RATIO;
-        var t = focusTargetsFor(r.top - originTop, r.height, vh, isTall, index === 0 || isTall);
-        item.classList.toggle("gallery-item--tall", isTall);
-        writeFocus(media, focusStyleFor(t.focus, t.y), 0);
-      });
-    };
 
     // How far an open project's image slides left in reveal mode (see
     // revealActive) to make room for its text panel.
@@ -992,17 +955,6 @@
       easeStep = easeAmount(EASE, dt);
       slideEaseStep = easeAmount(SLIDE_EASE, dt);
 
-      // Straight to the target on the first frame after a swap. The
-      // layer already showed the page dressed this way (see
-      // applySettledFocus), so easing in from the defaults here would
-      // undo that and make every image settle again, one by one, at the
-      // exact moment the reader is meant to see one finished surface.
-      if (seedFocus) {
-        easeStep = 1;
-        slideEaseStep = 1;
-        seedFocus = false;
-      }
-
       if (galleryPaused) {
         requestAnimationFrame(tick);
         return;
@@ -1081,18 +1033,15 @@
     requestAnimationFrame(tick);
   }
 
-  function initCategoryPage(options) {
-    // Undo whatever the previous run of this left behind. On a normal
-    // page load there is nothing to undo; after page-transition.js swaps
-    // in a new category's markup, this is what stops the outgoing one's
-    // loop and listeners from living on.
+  function initCategoryPage() {
+    // Undo whatever a previous run left behind. On an ordinary page load
+    // there is nothing to undo — this is what makes the whole setup safe
+    // to run more than once, rather than something that assumes it owns
+    // a fresh document.
     runCleanups();
 
-    options = options || {};
-    pendingLanding =
-      (options.landing || arrivalLanding) === "bottom" ? "bottom" : "top";
+    pendingLanding = arrivalLanding === "bottom" ? "bottom" : "top";
     arrivalLanding = null;
-    softSwap = !!options.softSwap;
 
     REVEAL_PAGE = document.body.classList.contains("project-reveal");
 
@@ -1127,9 +1076,8 @@
 
   document.addEventListener("DOMContentLoaded", initCategoryPage);
 
-  // page-transition.js calls this again after swapping in another
-  // category's markup, and pauses/resumes the focus loop while a
-  // transition is in flight.
-  window.initCategoryPage = initCategoryPage;
+  // page-transition.js quiets the focus loop while a transition is in
+  // flight, so the gallery isn't tracking a scroll position the reader
+  // has already left behind.
   window.galleryScrollControl = galleryScrollControl;
 })();
