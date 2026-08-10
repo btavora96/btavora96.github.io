@@ -36,13 +36,27 @@
     "webdesign.html": { prev: "social.html",    next: "home.html" }
   };
 
-  // Each category's own banner, so the strip that rises can be built
-  // without having loaded the page it belongs to. Kept in step with the
-  // inline style on each page's .scroll-banner-track.
-  var BANNERS = {
-    "branding.html":  { src: "assets/branding/banner/banner-branding.svg",   tile: 442.117 },
-    "social.html":    { src: "assets/social/banner/social.svg",              tile: 547.07 },
-    "webdesign.html": { src: "assets/webdesign/banner/webdesign-banner.svg", tile: 616.11 }
+  // What each strip says. Set as plain text rather than borrowing the
+  // category's own scrolling banner: the strip is here to name where the
+  // reader is going, and a word does that quietly, where the marquee
+  // arrives already in motion and competes with the movement it is
+  // riding on.
+  var LABELS = {
+    "branding.html":  "Branding",
+    "social.html":    "Social Media",
+    "webdesign.html": "Web Design"
+  };
+
+  // The first picture each page paints. Warmed while the strip is
+  // docked — a gesture's worth of time before it is needed — so the
+  // destination arrives with its opening image already decoded instead
+  // of showing an empty field for as long as that takes. Should this
+  // ever fall out of step with the markup the request simply misses and
+  // nothing else changes.
+  var FIRST_IMAGE = {
+    "branding.html":  "assets/branding/aurora-skincare.webp",
+    "social.html":    "assets/social/estoril-riviera.webp",
+    "webdesign.html": "assets/webdesign/361-retail.webp"
   };
 
   // The reveal happens in two acts rather than one long drag.
@@ -71,8 +85,17 @@
   var DOCK_AT = 0.45;       // release past this while lifting and it docks
   var COMMIT_AT = 0.16;     // release past this while pulling and it completes
   // Wheel has no "finger lifted" event, so a lull stands in for one.
-  var WHEEL_IDLE_MS = 140;
+  // Every millisecond of it is spent waiting to find out something the
+  // reader has already decided, so it is only as long as it has to be to
+  // not mistake the gap between two notches for the end of a gesture.
+  var WHEEL_IDLE_MS = 100;
+  // Past this much of an act, while the gesture is still going, the step
+  // is taken there and then rather than at the lull. A push this far is
+  // not ambiguous, and waiting to be told twice is what makes a page
+  // feel like it is thinking about it.
+  var AUTO_STEP_AT = 0.62;
   var SETTLE_MS = 760;
+  var COMMIT_MS = 420;      // the final rise, kept short — see commit()
   // px/ms of sustained push that completes regardless of distance.
   var FLICK_VELOCITY = 1.1;
   var VELOCITY_WINDOW_MS = 110;
@@ -92,6 +115,15 @@
   // belongs to the part the machine plays once the hand lets go.
   function easeOutExpo(t) {
     return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
+  }
+
+  // For the last movement, where expo is the wrong shape. Expo is 97%
+  // resolved at the halfway mark, so the rest of its span is motion too
+  // small to see — and since the page is only asked for once the span
+  // ends, that invisible tail is spent as waiting. Cubic covers its
+  // distance more evenly and finishes when it looks finished.
+  function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
   }
 
   var current = pageKey(location.pathname);
@@ -140,26 +172,15 @@
   layer.appendChild(layerInner);
   body.appendChild(layer);
 
-  // The strip is the whole picture during the gesture, so it shouldn't
-  // be arriving while the reader is watching it. Decoding both
-  // neighbours' banners once the page is quiet costs two small SVGs.
-  function warmBanners() {
-    [neighbours.prev, neighbours.next].forEach(function (href) {
-      var meta = BANNERS[href];
-      if (!meta) return;
-      var warm = new Image();
-      warm.src = meta.src;
-    });
-  }
-  if ("requestIdleCallback" in window) window.requestIdleCallback(warmBanners, { timeout: 3000 });
-  else window.setTimeout(warmBanners, 1500);
-
   // --------------------------------------------------------------- state
 
   var direction = null;   // "next" | "prev"
   var target = null;      // href being revealed
   var travel = 0;         // px of gesture accumulated within the current act
   var reveal = 0;         // 0 = hidden, 1 = the next page fills the viewport
+  var revealTarget = 0;   // where the gesture says reveal should be
+  var smoothing = false;  // the follow loop is running
+  var retracting = false; // pulled back out; sliding away rather than cut
   var docked = false;     // the banner has taken its place at the bottom edge
   var bannerHeight = 64;  // measured from the incoming page's own banner
   var busy = false;       // a settle animation owns the layer
@@ -242,25 +263,42 @@
 
   // ---------------------------------------------------------- layer setup
 
-  // What rises is the destination announced by its own banner, over its
-  // own background — not the page itself. It is a stand-in, and it is
-  // meant to be: the movement is about leaving one category for another,
-  // and the banner is what says which.
-  function categoryPreview(href) {
+  // Every destination rises the same way: one strip, naming where the
+  // reader is going, over the background the page will arrive on. It is
+  // a stand-in and it is meant to be — the movement is about leaving one
+  // category for the next, and a line of text is what says which.
+  function strip(className) {
     var wrap = document.createElement("div");
-    wrap.className = "pt-page-preview";
+    wrap.className = "pt-page-preview " + className;
 
-    var banner = document.createElement("div");
-    banner.className = "scroll-banner";
-    var track = document.createElement("div");
-    track.className = "scroll-banner-track";
-    var meta = BANNERS[href];
-    if (meta) {
-      track.style.backgroundImage = "url('" + meta.src + "')";
-      track.style.setProperty("--tile-vb-w", String(meta.tile));
-    }
-    banner.appendChild(track);
-    wrap.appendChild(banner);
+    var bar = document.createElement("div");
+    bar.className = "pt-strip";
+    var label = document.createElement("p");
+    label.className = "pt-strip-label";
+    bar.appendChild(label);
+    wrap.appendChild(bar);
+
+    wrap.label = label;
+    return wrap;
+  }
+
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  function downArrow() {
+    var svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", "pt-strip-arrow");
+    svg.setAttribute("viewBox", "0 0 12 18");
+    svg.setAttribute("aria-hidden", "true");
+    var path = document.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", "M6 2.2 V15.2 M1.8 10.8 L6 15.4 L10.2 10.8");
+    svg.appendChild(path);
+    return svg;
+  }
+
+  function categoryPreview(href) {
+    var wrap = strip("pt-preview-category");
+    wrap.label.textContent = LABELS[href] || "";
+    wrap.label.appendChild(downArrow());
     return wrap;
   }
 
@@ -268,26 +306,19 @@
   // so its strip says the thing the whole gallery has been building
   // towards instead, and carries the address to answer it.
   function homePreview() {
-    var wrap = document.createElement("div");
-    wrap.className = "pt-home-preview";
+    var wrap = strip("pt-preview-home");
+    var label = wrap.label;
+    label.classList.add("pt-strip-label--message");
 
-    var strip = document.createElement("div");
-    strip.className = "pt-home-banner";
-
-    var label = document.createElement("p");
-    label.className = "pt-home-label";
     label.appendChild(document.createTextNode("Enjoying so far? :-) "));
 
     var link = document.createElement("a");
-    link.className = "pt-home-link";
+    link.className = "pt-strip-link";
     link.href = "mailto:btavora96@gmail.com";
     link.textContent = "Get in touch";
     label.appendChild(link);
 
     label.appendChild(document.createTextNode(" and let’s work!"));
-
-    strip.appendChild(label);
-    wrap.appendChild(strip);
     return wrap;
   }
 
@@ -295,11 +326,16 @@
     target = targetHref();
     if (!target) return false;
 
+    // A previous reveal may still be sliding away when this one arms.
+    stopFollowing();
+    retracting = false;
+    reveal = 0;
+    revealTarget = 0;
+
     var isHome = target === "home.html";
 
     layerInner.innerHTML = "";
     layerInner.appendChild(isHome ? homePreview() : categoryPreview(target));
-    layer.classList.toggle("is-home", isHome);
     // Hidden from assistive technology while it is only scenery, but not
     // when it is carrying a real address the reader is invited to use.
     layer.setAttribute("aria-hidden", isHome ? "false" : "true");
@@ -308,12 +344,12 @@
     layer.classList.toggle("from-below", direction === "next");
     layer.classList.toggle("from-above", direction === "prev");
 
-    // Read the real strip rather than assuming 4rem — it is what decides
-    // where the detent sits, so a guess would leave the banner floating
-    // shy of the edge or bleeding past it. This has to come after the
-    // layer is displayed: a display:none box reports every rect as zero.
-    var strip = layerInner.querySelector(".scroll-banner, .pt-home-banner");
-    bannerHeight = strip ? Math.round(strip.getBoundingClientRect().height) || 64 : 64;
+    // Measure the strip rather than assuming 4rem — it is what decides
+    // where the detent sits, so a guess would leave it floating shy of
+    // the edge or bleeding past it. This has to come after the layer is
+    // displayed: a display:none box reports every rect as zero.
+    var bar = layerInner.querySelector(".pt-strip");
+    bannerHeight = bar ? Math.round(bar.getBoundingClientRect().height) || 64 : 64;
 
     // Backwards there is no banner to announce, so it goes straight to
     // the pulling act rather than pausing at a detent of zero height.
@@ -327,6 +363,10 @@
     scrim.classList.add("is-active");
     if (window.galleryScrollControl) window.galleryScrollControl.pause();
     armed = true;
+    // Put the layer at its starting edge before anything can be painted.
+    // Left to the stylesheet it would begin below the fold whichever way
+    // it is travelling, which is the wrong side coming down from above.
+    render();
     return true;
   }
 
@@ -358,6 +398,55 @@
     scrim.style.opacity = (reveal * 0.28).toFixed(3);
   }
 
+  // ------------------------------------------------------------ following
+  //
+  // The gesture sets where the reveal should be; this brings it there.
+  //
+  // Rendering the gesture straight through looks right on paper — one to
+  // one, nothing between hand and page — but a mouse wheel doesn't
+  // deliver a gesture, it delivers 120 pixels at a time with nothing in
+  // between. Drawn literally that is a series of steps, and no amount of
+  // easing on the settle afterwards hides that the movement itself was
+  // staccato. Following the target instead fills in what the wheel
+  // leaves out, while still going exactly where the hand says and no
+  // further. A trackpad, which sends a continuous stream, barely notices
+  // this is here at all.
+  var FOLLOW_PER_FRAME = 0.22; // fraction of the gap closed per frame at 60fps
+  var SETTLED = 0.0008;        // close enough to stop drawing
+
+  function startFollowing() {
+    if (smoothing) return;
+    smoothing = true;
+    var last = performance.now();
+
+    (function step(now) {
+      if (!smoothing) return;
+      // Re-derived from real elapsed time so a 120Hz display doesn't
+      // converge twice as fast as a 60Hz one.
+      var dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      reveal += (revealTarget - reveal) * (1 - Math.pow(1 - FOLLOW_PER_FRAME, dt * 60));
+
+      if (Math.abs(revealTarget - reveal) < SETTLED) {
+        reveal = revealTarget;
+        render();
+        if (retracting) {
+          smoothing = false;
+          clearVisuals();
+          reset();
+          return;
+        }
+      } else {
+        render();
+      }
+      requestAnimationFrame(step);
+    })(last);
+  }
+
+  function stopFollowing() {
+    smoothing = false;
+  }
+
   function clearVisuals() {
     // Removed outright rather than zeroed: an identity transform still
     // makes the shell a containing block for the page's fixed elements.
@@ -366,17 +455,20 @@
     scrim.classList.remove("is-active");
     scrim.style.opacity = "";
     layer.style.transform = "";
-    layer.classList.remove("is-active", "from-below", "from-above", "is-home");
+    layer.classList.remove("is-active", "from-below", "from-above");
     layer.setAttribute("aria-hidden", "true");
     layerInner.innerHTML = "";
     document.documentElement.classList.remove("pt-transitioning");
   }
 
   function reset() {
+    stopFollowing();
     direction = null;
     target = null;
     travel = 0;
     reveal = 0;
+    revealTarget = 0;
+    retracting = false;
     docked = false;
     armed = false;
     busy = false;
@@ -386,17 +478,23 @@
 
   // ------------------------------------------------------------- settling
 
-  function animateTo(destination, done) {
+  function animateTo(destination, done, spanMs, ease) {
     busy = true;
+    // The machine is playing this one, on its own curve. Two easings
+    // stacked on the same value would drag the tail out and make the
+    // ending feel soft rather than resolved.
+    stopFollowing();
+    revealTarget = destination;
     var from = reveal;
     var start = performance.now();
     // Scaled to the distance left, but with a floor: completing from
     // nearly-there should still read as a movement rather than a cut.
-    var span = Math.max(280, SETTLE_MS * Math.abs(destination - from));
+    var span = spanMs || Math.max(280, SETTLE_MS * Math.abs(destination - from));
+    var curve = ease || easeOutExpo;
 
     (function step(now) {
       var t = clamp((now - start) / span, 0, 1);
-      reveal = from + (destination - from) * easeOutExpo(t);
+      reveal = from + (destination - from) * curve(t);
       render();
       if (t < 1) requestAnimationFrame(step);
       else done();
@@ -416,6 +514,15 @@
       travel = 0;
       recent.length = 0;
       busy = false; // resting, but still very much in play
+
+      // Resting here is the one unhurried moment in the whole movement,
+      // and it is immediately before the moment that can least afford to
+      // wait. Spend it on the picture the destination opens with.
+      var first = FIRST_IMAGE[target];
+      if (first) {
+        var warm = new Image();
+        warm.src = first;
+      }
     });
   }
 
@@ -441,6 +548,13 @@
     var href = target;
     var wasDirection = direction;
 
+    // Deliberately shorter than a settle, and on a curve that resolves
+    // rather than trails off. Everything after this movement is the
+    // browser fetching a page, and every millisecond of easing that is
+    // too small to see is a millisecond added to the wait before it is
+    // even asked for. The label fades out across the same stretch (see
+    // .pt-strip-label in category-page.css), so what lands at the top is
+    // clean ground — and the page arriving on it has nothing to replace.
     animateTo(1, function () {
       // Straight there, with no fade. The layer is covering the viewport
       // by this point, so fading out would dissolve it to white and have
@@ -448,7 +562,7 @@
       // seam in the whole movement. Navigating outright instead lets the
       // browser hold these pixels until the new document can paint.
       window.location.href = href + arrivalFlag(wasDirection);
-    });
+    }, COMMIT_MS, easeOutCubic);
   }
 
   // A decisive flick should carry through even if it didn't get far in
@@ -520,22 +634,29 @@
       travel += DOCK_DISTANCE;
       docked = false;
     }
+    // Pulled back out of the transition entirely. The layer slides away
+    // under the follow loop rather than being cut, and the page is
+    // handed back its scroll immediately — the reader is already on
+    // their way somewhere else, and shouldn't have to wait out an
+    // animation to get there.
     if (travel <= 0) {
-      clearVisuals();
+      revealTarget = 0;
+      retracting = true;
+      armed = false;
       if (window.galleryScrollControl) window.galleryScrollControl.resume();
-      reset();
+      startFollowing();
       return false;
     }
 
-    reveal = computeReveal();
-    render();
+    revealTarget = computeReveal();
+    startFollowing();
 
-    // The act has been dragged all the way to its stop while the gesture
-    // is still going. Take the step now rather than sitting against the
-    // stop waiting for the wheel to fall quiet: the reader has already
-    // made their meaning plain, and holding out for a lull is what makes
-    // the page feel like it needs to be scrolled at twice.
-    if (actProgress() >= 1) {
+    // The act has been dragged well past the point of doubt while the
+    // gesture is still going. Take the step now rather than waiting for
+    // the wheel to fall quiet: the reader has already made their meaning
+    // plain, and holding out for a lull is what makes the page feel like
+    // it needs to be scrolled at twice.
+    if (actProgress() >= AUTO_STEP_AT) {
       gestureSpent = true;
       if (docked) commit();
       else settleToDock();

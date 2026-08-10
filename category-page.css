@@ -797,25 +797,13 @@ body {
    sitting above the one it's covering rather than butted against it —
    the single cue that most sells one surface passing over another. It
    fades up with the drag so it isn't a hard line at first contact. */
-.pt-layer.is-active::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 120px;
-  pointer-events: none;
-  opacity: calc(var(--pt-progress, 0) * 0.85);
-}
-
-.pt-layer.from-below::before {
-  top: -120px;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0));
-}
-
-.pt-layer.from-above::before {
-  bottom: -120px;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0));
-}
+/* No leading-edge shadow, by design. The incoming surface is the same
+   colour as the one it covers, and drawing a line where they meet is
+   what makes the movement read as a slab being pushed up the screen
+   rather than the page simply becoming the next one. What separates
+   them instead is depth: the page underneath eases back and dims a
+   little, so the plain ground rising over it has somewhere to rise
+   from. The only mark on it is the name of where you are going. */
 
 .pt-layer-inner {
   position: relative;
@@ -828,30 +816,35 @@ body {
   display: flow-root;
 }
 
-/* Home is previewed rather than injected — it has its own stylesheet
-   that restyles body wholesale. This borrows its warm charcoal so the
-   edge that appears belongs unmistakably to that page. */
-/* The surface that rises during a category transition: the destination
-   announced by its own banner, over the same background the page it
-   stands for will arrive on — so the hand-off at the end is the artwork
-   appearing, not the ground changing colour underneath it. See
-   categoryPreview in page-transition.js. */
+/* The surface that rises during a transition: the destination named on
+   a strip, over the background the page it stands for will arrive on —
+   so the hand-off at the end is the work appearing, not the ground
+   changing colour underneath it. See page-transition.js. */
 .pt-page-preview {
   position: absolute;
   inset: 0;
   background: #ececee;
 }
 
-.pt-home-preview {
-  position: absolute;
-  inset: 0;
+/* Home has its own stylesheet, which restyles body wholesale; this
+   borrows its warm charcoal so the edge that appears belongs
+   unmistakably to that page. */
+.pt-preview-home {
   background: #17140f;
 }
 
-/* Same height and place as a category's own banner, so Home docks
-   against the bottom edge exactly as the categories do — the strip is
-   what the detent is measured from. */
-.pt-home-banner {
+/* Same height and place as a category's own banner, so what docks
+   against the bottom edge sits exactly where the real strip will be —
+   and is what the detent is measured from.
+
+   Between categories it is a band of the destination's own ground with
+   its name on it, and nothing else: no bar, no marquee. Both pages are
+   the same colour, so what rises has no edge of its own to drag up the
+   screen — only the name, and the shadow the leading edge casts. That
+   is what makes the movement read as continuous rather than as a slab
+   being pushed into view. Home keeps a bar, because Home is a dark page
+   and the band is announcing that too. */
+.pt-strip {
   position: absolute;
   top: 0;
   left: 0;
@@ -861,28 +854,71 @@ body {
   align-items: center;
   justify-content: center;
   padding: 0 1.5rem;
+  background: transparent;
+}
+
+.pt-preview-home .pt-strip {
   background: #17140f;
 }
 
-/* Where a category strip carries a name, this one carries a sentence,
-   so it is set smaller and tracked tighter — enough to stay on one line
-   at ordinary widths without losing the banner's spaced-out voice. */
-.pt-home-label {
+/* Fades out over the last stretch of the rise, driven by the same
+   progress value that moves the layer — so it is tied to the movement
+   rather than timed against it, and can't fall out of step.
+
+   Its job is done the moment the strip reaches the top: it named where
+   the reader was going, and they have arrived. Left up, it would still
+   be sitting there while the browser fetches the page, and then be
+   replaced by that page's own banner — which is the pause that reads as
+   the next page being slow. Gone by the time it lands, what the page
+   arrives onto is clean ground with nothing to displace.
+
+   opacity clamps to [0,1], so the multiplier just means "fully visible
+   until the last fifth". */
+.pt-strip-label {
   margin: 0;
   font-family: "Ouma Devanagari", sans-serif;
   font-weight: 400;
-  font-size: clamp(0.58rem, 1.35vw, 0.9rem);
-  letter-spacing: 0.16em;
+  font-size: 1.1rem;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
   text-align: center;
   line-height: 1.4;
+  color: #1a1a1a;
+  opacity: calc((1 - var(--pt-progress, 0)) * 5);
+}
+
+.pt-preview-home .pt-strip-label {
   color: rgba(255, 255, 255, 0.92);
 }
 
-/* The one thing on this strip that can be acted on, so it is the one
+/* Says which way the gesture goes, on the two strips that are asking
+   for one. Sized in em so it tracks the label rather than needing its
+   own breakpoints, and nudged up off the baseline to sit optically
+   centred against uppercase letterforms. */
+.pt-strip-arrow {
+  width: 0.6em;
+  height: 0.85em;
+  margin-left: 0.5em;
+  vertical-align: -0.1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Home's strip carries a sentence where the others carry a name, so it
+   is set smaller and tracked tighter — enough to stay on one line at
+   ordinary widths without losing the strip's spaced-out voice. */
+.pt-strip-label--message {
+  font-size: clamp(0.58rem, 1.35vw, 0.9rem);
+  letter-spacing: 0.16em;
+}
+
+/* The one thing on these strips that can be acted on, so it is the one
    thing marked. Underlined rather than coloured: the strip has no
    palette to spend, and an underline reads as a link at any size. */
-.pt-home-link {
+.pt-strip-link {
   color: inherit;
   text-decoration: underline;
   text-underline-offset: 0.35em;
@@ -890,8 +926,8 @@ body {
   transition: opacity 0.3s ease;
 }
 
-.pt-home-link:hover,
-.pt-home-link:focus-visible {
+.pt-strip-link:hover,
+.pt-strip-link:focus-visible {
   opacity: 0.65;
 }
 
