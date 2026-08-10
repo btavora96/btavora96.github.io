@@ -122,7 +122,16 @@ body {
   position: fixed;
   z-index: 40;
   color: #ececee;
-  max-width: min(26rem, calc(100vw - 4rem));
+  /* The measure is chosen for the rag, and both paragraphs share it, so
+     it is one setting serving both. Narrowed from 26rem to stop lines
+     ending on stranded words: at the old width they finished on
+     "…everything in", "…where every", "…with character," and "…social,
+     and". The band where all four fall to the next line instead is
+     344–368px, and this sits in the middle of it — wide enough that a
+     font rendering a shade wide or narrow can't tip the composition
+     back. Both paragraphs stay three lines, so the block's height is
+     unchanged. */
+  max-width: min(22.25rem, calc(100vw - 4rem));
   opacity: 0;
   transform: translateY(10px);
   transition: opacity 0.9s cubic-bezier(0.16, 1, 0.3, 1),
@@ -168,6 +177,19 @@ body.kc-settled .contact-box {
 
 .hello-box p:last-child {
   margin-bottom: 0;
+}
+
+/* An aside rather than a third point: set smaller so it sits below the
+   introduction instead of continuing it. Not dimmed to get there — the
+   two blocks are deliberately one colour (see .info-box) and size alone
+   carries the difference. */
+/* Qualified with .hello-box, because the rule setting the paragraph
+   size above is `.hello-box p` — a class *and* an element — and a bare
+   class on its own loses to it. Unqualified, this silently did nothing. */
+.hello-box p.hello-note {
+  font-size: 0.78rem;
+  letter-spacing: 0.01em;
+  margin-top: 1.5rem;
 }
 
 .contact-box {
@@ -272,6 +294,13 @@ body.kc-settled .contact-box {
     font-size: 1rem;
     line-height: 1.75;
     margin: 0 0 1.35rem;
+  }
+
+  /* Kept proportionally smaller here too — the rule above would
+     otherwise pull it back up to full size on a phone. */
+  .hello-box p.hello-note {
+    font-size: 0.82rem;
+    margin-top: 1.75rem;
   }
 
   .contact-box {
