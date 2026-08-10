@@ -146,6 +146,16 @@
   outline: none;
 }
 
+/* A tag with no href is a category that isn't open yet. It keeps its
+   place on the ring and keeps swinging with the others — it is part of
+   the object, not a menu entry that can simply be deleted — but it
+   stops pretending to be something to click. An <a> without an href is
+   already inert and out of the tab order; this is only about not
+   offering a hand cursor for something that leads nowhere. */
+.kc-item:not([href]) {
+  cursor: default;
+}
+
 .kc-item.is-active,
 .kc-item.is-selected {
   z-index: 3;

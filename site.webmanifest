@@ -1,0 +1,15 @@
+{
+  "name": "Bárbara Távora",
+  "short_name": "B. Távora",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#17140f",
+  "theme_color": "#D85888",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

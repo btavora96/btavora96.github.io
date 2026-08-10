@@ -1,2 +1,8 @@
+# macOS
 .DS_Store
+
+# Local Claude Code settings (machine-specific)
 .claude/settings.local.json
+
+# Fonts and assets kept out of the shipped site — see README
+.attic/

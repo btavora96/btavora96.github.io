@@ -3,7 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Home</title>
+  <title>Bárbara Távora — Art Director &amp; Graphic Designer</title>
+  <meta name="description" content="Art Director &amp; Graphic Designer working across branding, digital, social, and everything in between." />
+  <link rel="canonical" href="https://barbaratavora.com/home.html" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Bárbara Távora" />
+  <meta property="og:title" content="Bárbara Távora — Art Director &amp; Graphic Designer" />
+  <meta property="og:description" content="Art Director &amp; Graphic Designer working across branding, digital, social, and everything in between." />
+  <meta property="og:url" content="https://barbaratavora.com/home.html" />
+  <meta property="og:image" content="https://barbaratavora.com/assets/keychains/BG.webp" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="site.webmanifest" />
+  <meta name="theme-color" content="#D85888" />
   <!-- Preload hints for the same images the markup below requests, so
        the browser can start fetching all of them the moment it reads
        <head>, in parallel with CSS/JS, rather than discovering them one
@@ -15,9 +27,9 @@
   <link rel="preload" as="image" href="assets/keychains/SOCIAL-KC.webp" type="image/webp" fetchpriority="high" />
   <link rel="preload" as="image" href="assets/keychains/WEB-KC.webp" type="image/webp" fetchpriority="high" />
   <link rel="preload" as="image" href="assets/keychains/STAR-KC.webp" type="image/webp" fetchpriority="high" />
-  <link rel="stylesheet" href="page.css?v=26" />
-  <link rel="stylesheet" href="components/keychains/keychain-cluster.css?v=15" />
-  <link rel="stylesheet" href="transition.css?v=1" />
+  <link rel="stylesheet" href="page.css?v=27" />
+  <link rel="stylesheet" href="components/keychains/keychain-cluster.css?v=16" />
+  <link rel="stylesheet" href="transition.css?v=6" />
   <noscript><style>body { opacity: 1 !important; }</style></noscript>
 </head>
 <body>
@@ -32,22 +44,28 @@
        rebuilding it. -->
   <div class="keychain-cluster">
     <div class="keychain-canvas">
-      <img class="kc-bg" src="assets/keychains/BG.webp" alt="" aria-hidden="true" draggable="false" fetchpriority="high" decoding="async" />
+      <img class="kc-bg" src="assets/keychains/BG.webp" alt="" aria-hidden="true" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
 
       <a href="webdesign.html" class="kc-item" data-key="web" aria-label="Web Design — ver projetos">
-        <img class="kc-img" src="assets/keychains/WEB-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" />
+        <img class="kc-img" src="assets/keychains/WEB-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
         <span class="kc-glare" aria-hidden="true"></span>
       </a>
-      <a href="other.html" class="kc-item" data-key="star" aria-label="Others — ver projetos">
-        <img class="kc-img" src="assets/keychains/STAR-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" />
+      <!-- Others is switched off while it has no projects: the tag stays
+           on the ring, because it is part of the object the home page
+           is a picture of, but it leads nowhere. To turn it back on,
+           restore href="other.html" here, put the same href back in
+           keychain-cluster.js's TAGS, drop the noindex from other.html
+           and add it to sitemap.xml. -->
+      <a class="kc-item" data-key="star" aria-label="Others — em breve" aria-disabled="true">
+        <img class="kc-img" src="assets/keychains/STAR-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
         <span class="kc-glare" aria-hidden="true"></span>
       </a>
       <a href="branding.html" class="kc-item" data-key="branding" aria-label="Branding — ver projetos">
-        <img class="kc-img" src="assets/keychains/BRANDING-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" />
+        <img class="kc-img" src="assets/keychains/BRANDING-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
         <span class="kc-glare" aria-hidden="true"></span>
       </a>
       <a href="social.html" class="kc-item" data-key="social" aria-label="Social Media — ver projetos">
-        <img class="kc-img" src="assets/keychains/SOCIAL-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" />
+        <img class="kc-img" src="assets/keychains/SOCIAL-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
         <span class="kc-glare" aria-hidden="true"></span>
       </a>
 
@@ -56,7 +74,7 @@
   </div>
 
   <div class="info-box hello-box">
-    <h2 class="info-heading">Hello :-)</h2>
+    <h1 class="info-heading">Hello :-)</h1>
     <p>I’m Bárbara Távora, an Art Director &amp; Graphic Designer working across branding, digital, social, and everything in between.</p>
     <p>Driven by a strong visual culture and a healthy obsession with craft, I create narratives with character, where every detail has a role.</p>
     <p class="hello-note">This website was made by me.</p>
@@ -69,7 +87,7 @@
     <p class="contact-subtitle">Say hello! Let's work together.</p>
   </div>
 
-  <script src="transition.js?v=3" defer></script>
-  <script src="components/keychains/keychain-cluster.js?v=14" defer></script>
+  <script src="transition.js?v=6" defer></script>
+  <script src="components/keychains/keychain-cluster.js?v=15" defer></script>
 </body>
 </html>

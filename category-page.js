@@ -1020,6 +1020,36 @@
     var myLoopToken = ++loopToken;
     onCleanup(function () { loopToken++; });
 
+    // Sleeping when there is nothing to do.
+    //
+    // This loop measures every project and rewrites its styles on every
+    // frame. That is the right thing while the reader is scrolling and
+    // the effect is chasing its targets — and pure waste for as long as
+    // the page sits still, which on a gallery is most of the time. It
+    // was running regardless, forever, keeping a phone's CPU from ever
+    // settling and its battery draining for no visible result.
+    //
+    // So: once every value has reached its target and stayed there for a
+    // few frames, the body of the loop is skipped. Anything that could
+    // change what the targets are wakes it again. The loop itself keeps
+    // turning — cheaper and far safer than tearing it down and having to
+    // remember every route back — but while asleep it does nothing but
+    // check whether it should still be.
+    var SETTLE_EPSILON = 0.004;
+    var IDLE_FRAMES_BEFORE_SLEEP = 4;
+    var idleFrames = 0;
+
+    function wake() { idleFrames = 0; }
+
+    // Every route by which the targets can change: the reader moving the
+    // page, the viewport changing shape, or any interaction at all —
+    // opening a panel, stepping a carousel, focusing a control.
+    ["scroll", "wheel", "touchstart", "touchmove", "pointerdown", "keydown", "resize"]
+      .forEach(function (type) {
+        listen(window, type, wake, { passive: true });
+      });
+    listen(document, "focusin", wake, { passive: true });
+
     function tick() {
       if (myLoopToken !== loopToken) return;
       var frameNow = performance.now();
@@ -1037,6 +1067,11 @@
         return;
       }
 
+      if (idleFrames > IDLE_FRAMES_BEFORE_SLEEP) {
+        requestAnimationFrame(tick);
+        return;
+      }
+
       // Deliberately below the pause check: this is spent the first time
       // it is used, and a frame that returns early hasn't written
       // anything to spend it on.
@@ -1045,6 +1080,7 @@
         slideEaseStep = 1;
         floatEaseStep = 1;
         seedFocus = false;
+        wake();
       }
 
       var vh = window.innerHeight;
@@ -1052,6 +1088,10 @@
       var bestEntry = null;
       var bestRect = null;
       var bestFocus = -1;
+      // Cleared by any value still meaningfully short of where it is
+      // heading. Only a frame in which everything has arrived counts
+      // towards going to sleep.
+      var settled = true;
 
       entries.forEach(function (entry) {
         var rect = entry.media.getBoundingClientRect();
@@ -1099,6 +1139,14 @@
         // less visual noise.
         var want = focusStyleFor(focus, yTarget);
         var cur = entry.cur;
+        if (settled &&
+            (Math.abs(cur.scale - want.scale) > SETTLE_EPSILON ||
+             Math.abs(cur.opacity - want.opacity) > SETTLE_EPSILON ||
+             Math.abs(cur.blur - want.blur) > SETTLE_EPSILON ||
+             Math.abs(cur.y - want.y) > SETTLE_EPSILON ||
+             Math.abs(cur.slideX - slideTarget) > SETTLE_EPSILON)) {
+          settled = false;
+        }
         cur.scale = lerp(cur.scale, want.scale, easeStep);
         cur.y = lerp(cur.y, want.y, easeStep);
         cur.slideX = lerp(cur.slideX, slideTarget, slideEaseStep);
@@ -1117,12 +1165,19 @@
       // as "focus moved elsewhere" — that would silently close whatever
       // was open. Only a real, positively-focused entry can take over.
       if (floatingBtn && bestEntry) {
+        var beforeTop = floatTop;
         setActiveEntry(bestEntry);
         // Tracked every frame rather than set once: the arrows move
         // with the artwork as it scrolls, so the button has to as well
         // to stay level with them.
         updateFloatingVertical(bestRect);
+        // The button is still travelling to its project's middle, so
+        // this frame is not a resting one either.
+        if (beforeTop !== null && Math.abs(floatTop - beforeTop) > 0.05) settled = false;
       }
+
+      if (settled) idleFrames++;
+      else idleFrames = 0;
 
       requestAnimationFrame(tick);
     }

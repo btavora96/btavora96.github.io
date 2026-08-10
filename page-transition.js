@@ -409,18 +409,22 @@
   var BOTTOM_SLACK = 340;
   var TOP_SLACK = 60;
 
-  var lastScrollY = window.scrollY;
-  var stillFrames = 0;
+  // Rest used to be counted in frames by a requestAnimationFrame loop
+  // that ran for the entire life of the page — every frame, forever,
+  // to answer a question that only matters at the two moments the
+  // reader reaches an edge. A scroll event says the same thing and only
+  // fires when there is something to say, so between gestures the main
+  // thread is left alone entirely. Same threshold, expressed in the time
+  // those four frames took rather than in frames.
+  var REST_MS = (STILL_FRAMES_FOR_REST / 60) * 1000;
+  var lastScrollAt = performance.now();
 
-  (function watchRest() {
-    var y = window.scrollY;
-    if (Math.abs(y - lastScrollY) < 0.5) stillFrames++;
-    else { stillFrames = 0; lastScrollY = y; }
-    requestAnimationFrame(watchRest);
-  })();
+  window.addEventListener("scroll", function () {
+    lastScrollAt = performance.now();
+  }, { passive: true });
 
   function atRest() {
-    return stillFrames >= STILL_FRAMES_FOR_REST;
+    return performance.now() - lastScrollAt >= REST_MS;
   }
 
   function atBottom() {
@@ -1032,21 +1036,6 @@
   window.addEventListener("popstate", function () {
     window.location.reload();
   });
-
-  // Whether the seamless path is available at all comes down to a
-  // browser policy this page can't see from the outside, and the two
-  // outcomes look quite different to read. Left here so the question can
-  // be answered from the console in one line instead of inferred.
-  window.__ptStatus = function () {
-    return {
-      protocol: location.protocol,
-      framesReadable: FRAMES_READABLE,
-      frames: Object.keys(frames).map(function (k) {
-        return k + (loaded[k] ? " (loaded)" : " (loading)") +
-          (frameDoc(k) ? " readable" : " unreadable");
-      })
-    };
-  };
 
   window.addEventListener("pageshow", function (e) {
     if (e.persisted) {

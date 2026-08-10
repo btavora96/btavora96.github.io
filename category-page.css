@@ -17,32 +17,8 @@
 
 @font-face {
   font-family: "Ouma Devanagari";
-  src: url("assets/font1/fonnts.com-Ouma_Devanagari_Medium-1.otf") format("opentype");
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Ouma Devanagari";
-  src: url("assets/font1/fonnts.com-Ouma_Devanagari_SemiBold.otf") format("opentype");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Ouma Devanagari";
   src: url("assets/font1/fonnts.com-Ouma_Devanagari_Bold.otf") format("opentype");
   font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Ouma Devanagari";
-  src: url("assets/font1/fonnts.com-Ouma_Devanagari_Light.otf") format("opentype");
-  font-weight: 300;
   font-style: normal;
   font-display: swap;
 }
@@ -57,6 +33,25 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* Present for assistive technology and for the document outline, absent
+   from the design. Every category page's name is carried by the scrolling
+   banner, which is decorative and marked aria-hidden — so to a screen
+   reader these pages had no heading at all, and no way to say where you
+   were. Clipped rather than display:none, which would remove it from the
+   accessibility tree along with everything else. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 html, body {
@@ -487,6 +482,30 @@ body {
 
 .gallery-frame-arrow--next {
   right: -3.25rem;
+}
+
+/* Once the frame is as wide as the screen there is no "outside" left to
+   sit in, and these were ending up almost entirely past the edge — five
+   visible pixels each, which on a phone means the carousels simply
+   cannot be stepped through. Brought inside the frame at that point,
+   over the artwork's own margin, which is the only place left for them.
+   They keep the same pill, size and vertical placement; a translucent
+   ground is added purely so they stay legible against whatever they now
+   sit on top of. */
+@media (max-width: 900px) {
+  .gallery-frame-arrow {
+    background: rgba(253, 253, 252, 0.82);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .gallery-frame-arrow--prev {
+    left: 0.5rem;
+  }
+
+  .gallery-frame-arrow--next {
+    right: 0.5rem;
+  }
 }
 
 /* Bare "+" pill, styled identically to .back-button — same border weight,
