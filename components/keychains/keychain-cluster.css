@@ -147,13 +147,23 @@
 }
 
 /* A tag with no href is a category that isn't open yet. It keeps its
-   place on the ring and keeps swinging with the others — it is part of
-   the object, not a menu entry that can simply be deleted — but it
-   stops pretending to be something to click. An <a> without an href is
-   already inert and out of the tab order; this is only about not
-   offering a hand cursor for something that leads nowhere. */
+   place on the ring — it belongs to the object the home page is a
+   picture of — but it stops behaving like something to click. An <a>
+   without an href is already inert and out of the tab order; this is
+   about the two things that are still offered by hand. */
 .kc-item:not([href]) {
   cursor: default;
+}
+
+/* Above all, it must not lift. Hovering any tag raises it over the
+   others (see .is-active below) — which is right for a category you are
+   about to open, and wrong for one that opens nothing: the star, drawn
+   furthest left of the four, would jump out in front of Branding for as
+   long as the cursor crossed it. It keeps its tilt, because that is the
+   object responding to being touched; it just stays in its own layer. */
+.kc-item:not([href]).is-active,
+.kc-item:not([href]).is-selected {
+  z-index: 2;
 }
 
 .kc-item.is-active,

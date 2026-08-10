@@ -28,7 +28,7 @@
   <link rel="preload" as="image" href="assets/keychains/WEB-KC.webp" type="image/webp" fetchpriority="high" />
   <link rel="preload" as="image" href="assets/keychains/STAR-KC.webp" type="image/webp" fetchpriority="high" />
   <link rel="stylesheet" href="page.css?v=27" />
-  <link rel="stylesheet" href="components/keychains/keychain-cluster.css?v=16" />
+  <link rel="stylesheet" href="components/keychains/keychain-cluster.css?v=18" />
   <link rel="stylesheet" href="transition.css?v=6" />
   <noscript><style>body { opacity: 1 !important; }</style></noscript>
 </head>
@@ -50,12 +50,14 @@
         <img class="kc-img" src="assets/keychains/WEB-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
         <span class="kc-glare" aria-hidden="true"></span>
       </a>
-      <!-- Others is switched off while it has no projects: the tag stays
-           on the ring, because it is part of the object the home page
-           is a picture of, but it leads nowhere. To turn it back on,
-           restore href="other.html" here, put the same href back in
-           keychain-cluster.js's TAGS, drop the noindex from other.html
-           and add it to sitemap.xml. -->
+      <!-- Others is switched off while it has no projects. The tag stays
+           on the ring — it is part of the object this page is a picture
+           of — but it leads nowhere, takes no cursor, and no longer
+           lifts over its neighbours on hover (see .kc-item:not([href])
+           in the stylesheet). To turn it back on: restore
+           href="other.html" here, put the same href back in
+           keychain-cluster.js's TAGS, drop the noindex from other.html,
+           and add the page to sitemap.xml. -->
       <a class="kc-item" data-key="star" aria-label="Others — em breve" aria-disabled="true">
         <img class="kc-img" src="assets/keychains/STAR-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
         <span class="kc-glare" aria-hidden="true"></span>
