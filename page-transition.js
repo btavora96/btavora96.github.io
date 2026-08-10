@@ -47,16 +47,26 @@
     "webdesign.html": "Web Design"
   };
 
-  // The first picture each page paints. Warmed while the strip is
-  // docked — a gesture's worth of time before it is needed — so the
-  // destination arrives with its opening image already decoded instead
-  // of showing an empty field for as long as that takes. Should this
-  // ever fall out of step with the markup the request simply misses and
-  // nothing else changes.
-  var FIRST_IMAGE = {
-    "branding.html":  "assets/branding/aurora-skincare.webp",
-    "social.html":    "assets/social/estoril-riviera.webp",
-    "webdesign.html": "assets/webdesign/361-retail.webp"
+  // The pictures each page opens with, in order. Warmed while the strip
+  // is docked — a gesture's worth of time before they are needed — so
+  // the destination arrives with its first screen already decoded
+  // instead of assembling itself while the reader watches. Nothing waits
+  // on these: if one hasn't landed by the time the page does, the page
+  // goes ahead without it. Should this ever fall out of step with the
+  // markup the request simply misses and nothing else changes.
+  var FIRST_IMAGES = {
+    "branding.html": [
+      "assets/branding/aurora-skincare.webp",
+      "assets/branding/cascais-ópera.webp",
+      "assets/branding/crafthouse-coffee.webp"
+    ],
+    "social.html": [
+      "assets/social/estoril-riviera.webp",
+      "assets/social/rud-jewelry.webp"
+    ],
+    "webdesign.html": [
+      "assets/webdesign/361-retail.webp"
+    ]
   };
 
   // The reveal happens in two acts rather than one long drag.
@@ -96,6 +106,7 @@
   var AUTO_STEP_AT = 0.62;
   var SETTLE_MS = 760;
   var COMMIT_MS = 420;      // the final rise, kept short — see commit()
+  var LAYER_DISSOLVE_MS = 260; // must match .pt-layer.is-dissolving
   // px/ms of sustained push that completes regardless of distance.
   var FLICK_VELOCITY = 1.1;
   var VELOCITY_WINDOW_MS = 110;
@@ -125,6 +136,19 @@
   function easeOutCubic(t) {
     return 1 - Math.pow(1 - t, 3);
   }
+
+  // Body classes owned by the running document rather than by any one
+  // page's markup, and so carried across a swap rather than replaced by
+  // it. page-ready above all: transition.css hides body until it is set,
+  // so copying the incoming class list wholesale hands the reader a
+  // perfectly laid out, completely invisible page.
+  var RUNTIME_BODY_CLASSES = ["page-ready", "page-leaving"];
+
+  // This file also runs inside the source frames it creates below. In
+  // there it must do nothing — a page standing by to be adopted has no
+  // business running a transition system of its own.
+  var PREVIEW_FLAG = "pt-preview";
+  if (location.search.indexOf(PREVIEW_FLAG) !== -1) return;
 
   var current = pageKey(location.pathname);
   var neighbours = CHAIN[current];
@@ -171,6 +195,99 @@
   layerInner.className = "pt-layer-inner";
   layer.appendChild(layerInner);
   body.appendChild(layer);
+
+  // ---------------------------------------------------------- the source
+  //
+  // Where the next page comes from. Not fetched — a browser refuses to
+  // let one file:// document read another that way, every local file
+  // being its own opaque origin — but an iframe is allowed to load it,
+  // and its contentDocument is readable. That distinction is the whole
+  // reason this can be seamless from disk as well as from a server.
+  //
+  // The frame is never shown. What rises is still the strip; this only
+  // exists so that at the end there is a live, laid-out, already-decoded
+  // page to hand over, instead of a navigation and the second or so it
+  // takes a browser to build a document from nothing.
+  var frames = {};
+
+  function frameFor(href) {
+    if (!href || href === "home.html" || frames[href]) return;
+    var frame = document.createElement("iframe");
+    frame.className = "pt-source";
+    frame.setAttribute("aria-hidden", "true");
+    frame.setAttribute("tabindex", "-1");
+    frame.src = href + "?" + PREVIEW_FLAG;
+    frame.addEventListener("load", function () {
+      // visibility:hidden lays out but doesn't paint, and an image that
+      // is never painted may never be decoded — which would put the
+      // decode back at the moment of the swap, exactly where a blank
+      // frame comes from. Asking for it explicitly settles that.
+      var doc = frameDoc(href);
+      if (!doc) return;
+      Array.prototype.slice.call(doc.querySelectorAll("img"), 0, 4)
+        .forEach(function (img) {
+          if (img.decode) img.decode().catch(function () {});
+        });
+    });
+    document.body.appendChild(frame);
+    frames[href] = frame;
+  }
+
+  // Readable only once it holds the page it was pointed at. A frame that
+  // is still loading reports about:blank, and adopting that would swap
+  // in an empty document.
+  function frameDoc(href) {
+    var frame = frames[href];
+    if (!frame) return null;
+    var doc;
+    try { doc = frame.contentDocument; } catch (e) { return null; }
+    if (!doc || !doc.body) return null;
+    if (!doc.querySelector(".project-grid")) return null;
+    return doc;
+  }
+
+  function prepareNeighbours() {
+    frameFor(neighbours.next);
+    frameFor(neighbours.prev);
+  }
+
+  // As soon as this page has finished loading, and not a moment later.
+  // Everything downstream depends on the neighbour being ready by the
+  // time the reader reaches the end of a category: a frame that isn't
+  // ready means falling back to a real navigation, and a real navigation
+  // is the only thing here that can show a white screen. Waiting for an
+  // idle callback was leaving that to chance.
+  if (document.readyState === "complete") prepareNeighbours();
+  else window.addEventListener("load", prepareNeighbours, { once: true });
+
+  // Standing at the top or the bottom of a category is the last warning
+  // before a transition; anything still missing is asked for now.
+  function ensureNeighbour(href) {
+    if (href && !frames[href]) frameFor(href);
+  }
+
+  // A frame that hasn't finished loading is worth a short wait. What the
+  // reader is looking at meanwhile is the layer, covering the viewport
+  // in the destination's own ground — still, continuous, and the right
+  // colour. Navigating instead would replace that with the browser's
+  // blank. Waiting is the lesser evil; in practice neither happens,
+  // because the frame has been loading since this page finished.
+  var FRAME_WAIT_MS = 1200;
+
+  function whenFrameReady(href, cb) {
+    var doc = frameDoc(href);
+    if (doc) return cb(doc);
+    var frame = frames[href];
+    if (!frame) return cb(null);
+    var settled = false;
+    function done() {
+      if (settled) return;
+      settled = true;
+      cb(frameDoc(href));
+    }
+    frame.addEventListener("load", done, { once: true });
+    window.setTimeout(done, FRAME_WAIT_MS);
+  }
 
   // --------------------------------------------------------------- state
 
@@ -326,8 +443,15 @@
     target = targetHref();
     if (!target) return false;
 
-    // A previous reveal may still be sliding away when this one arms.
+    // Last call. If this one was never built — or was thrown away by an
+    // earlier swap — it starts loading now, while the strip has two acts
+    // to travel before anyone needs it.
+    ensureNeighbour(target);
+
+    // A previous reveal may still be sliding away — or dissolving off a
+    // page that has already been swapped in — when this one arms.
     stopFollowing();
+    layer.classList.remove("is-dissolving");
     retracting = false;
     reveal = 0;
     revealTarget = 0;
@@ -517,12 +641,11 @@
 
       // Resting here is the one unhurried moment in the whole movement,
       // and it is immediately before the moment that can least afford to
-      // wait. Spend it on the picture the destination opens with.
-      var first = FIRST_IMAGE[target];
-      if (first) {
+      // wait. Spend it on the pictures the destination opens with.
+      (FIRST_IMAGES[target] || []).forEach(function (src) {
         var warm = new Image();
-        warm.src = first;
-      }
+        warm.src = src;
+      });
     });
   }
 
@@ -548,21 +671,107 @@
     var href = target;
     var wasDirection = direction;
 
-    // Deliberately shorter than a settle, and on a curve that resolves
-    // rather than trails off. Everything after this movement is the
-    // browser fetching a page, and every millisecond of easing that is
-    // too small to see is a millisecond added to the wait before it is
-    // even asked for. The label fades out across the same stretch (see
-    // .pt-strip-label in category-page.css), so what lands at the top is
-    // clean ground — and the page arriving on it has nothing to replace.
+    // Deliberately short, and on a curve that resolves rather than
+    // trails off: the label fades out across the same stretch, so what
+    // lands at the top is clean ground with nothing to replace.
     animateTo(1, function () {
-      // Straight there, with no fade. The layer is covering the viewport
-      // by this point, so fading out would dissolve it to white and have
-      // the real page build back from white behind it — the one visible
-      // seam in the whole movement. Navigating outright instead lets the
-      // browser hold these pixels until the new document can paint.
-      window.location.href = href + arrivalFlag(wasDirection);
+      whenFrameReady(href, function (doc) {
+        if (doc) {
+          swapTo(href, doc, wasDirection);
+          return;
+        }
+        // Nothing standing by at all — the destination is Home, which
+        // has its own stylesheet and its own simulation and is not
+        // something to graft into a category page. The layer is covering
+        // the viewport, so navigating outright lets the browser hold
+        // these pixels for as long as it will.
+        window.location.href = href + arrivalFlag(wasDirection);
+      });
     }, COMMIT_MS, easeOutCubic);
+  }
+
+  // Becoming the next page without reloading. The nodes come out of the
+  // frame alive — laid out, styled, their images already decoded — so
+  // moving them here is close to a no-op visually, where rebuilding them
+  // from markup would mean decoding everything again and showing a blank
+  // frame while that happened.
+  function swapTo(href, doc, wasDirection) {
+    history.pushState({ pageTransition: true }, "", href);
+    document.title = doc.title;
+
+    var runtimeClasses = RUNTIME_BODY_CLASSES.filter(function (name) {
+      return document.body.classList.contains(name);
+    });
+    document.body.className = doc.body.className;
+    runtimeClasses.forEach(function (name) {
+      document.body.classList.add(name);
+    });
+
+    shell.innerHTML = "";
+    // Explicit adoption: these nodes belong to the frame's document
+    // until they are told otherwise.
+    Array.prototype.slice.call(doc.body.children).forEach(function (child) {
+      if (child.tagName === "SCRIPT") return;
+      shell.appendChild(document.adoptNode(child));
+    });
+
+    current = href;
+    neighbours = CHAIN[current];
+
+    // The frame this page came out of has been emptied of everything
+    // worth having. The others are kept if they are still neighbours of
+    // where we have landed — travelling down the chain, the category
+    // just left is the one behind the new one, and rebuilding a frame
+    // that is already loaded would put a real navigation back in reach
+    // for no reason at all.
+    if (frames[href]) {
+      frames[href].remove();
+      delete frames[href];
+    }
+    Object.keys(frames).forEach(function (key) {
+      if (key === neighbours.prev || key === neighbours.next) return;
+      frames[key].remove();
+      delete frames[key];
+    });
+
+    // Everything that was dressing the *outgoing* page stops now: the
+    // shell is the new page, and must not be left scaled, shifted, or
+    // with snapping still switched off.
+    shell.style.transform = "";
+    shell.style.willChange = "";
+    scrim.classList.remove("is-active");
+    scrim.style.opacity = "";
+    document.documentElement.classList.remove("pt-transitioning");
+
+    // The gesture is live again immediately — the reader shouldn't have
+    // to wait out a fade to keep scrolling — while the layer dissolves
+    // off the page it is now merely covering.
+    reset();
+    layer.classList.add("is-dissolving");
+
+    // Belt and braces, because the failure here is not cosmetic: a layer
+    // left dissolved is invisible but still covering the viewport, and
+    // would swallow every click on the page behind it. transitionend
+    // doesn't fire at all when the transition is suppressed — which is
+    // exactly what prefers-reduced-motion does to this rule. Whichever
+    // arrives first wins; both do the same thing.
+    var finished = false;
+    function finishDissolve() {
+      if (finished) return;
+      finished = true;
+      layer.classList.remove("is-dissolving");
+      clearVisuals();
+    }
+    layer.addEventListener("transitionend", finishDissolve, { once: true });
+    window.setTimeout(finishDissolve, LAYER_DISSOLVE_MS + 120);
+
+    window.initCategoryPage({
+      landing: wasDirection === "prev" ? "bottom" : "top",
+      softSwap: true
+    });
+    if (window.galleryScrollControl) window.galleryScrollControl.resume();
+
+    prepareNeighbours();
   }
 
   // A decisive flick should carry through even if it didn't get far in
@@ -693,10 +902,33 @@
     }, { passive: true });
   });
 
-  // Anything that navigates for real — the back button, a keychain link,
-  // the browser's own back — should not find a half-drawn transition
-  // still on screen.
-  window.addEventListener("pagehide", function () {
-    if (armed) clearVisuals();
+  // Coming back to this page from the browser's own history, it can be
+  // restored exactly as it was left — which, if it was left mid-gesture,
+  // means a transition layer still covering the screen with nowhere to
+  // go. Undone on restore rather than on the way out.
+  //
+  // On the way out is precisely where it must *not* be undone. The layer
+  // covering the viewport is the last thing the browser paints before it
+  // navigates, and it holds those pixels until the incoming document can
+  // paint its own. Tearing the layer down as the page leaves hands that
+  // final frame back to the page being left — so the reader watches the
+  // category they just walked out of reappear for an instant, looking
+  // for all the world like it reloaded, before the new one arrives.
+  // Everything inside body goes with the page anyway; there is nothing
+  // here that needs cleaning up on the way out.
+  // A swap moved the URL without a load, so the browser's own back
+  // button now has somewhere to go that this document can't render.
+  // Reloading is honest: seamless in the direction the reader is
+  // actually travelling is worth more than clever in reverse.
+  window.addEventListener("popstate", function () {
+    window.location.reload();
+  });
+
+  window.addEventListener("pageshow", function (e) {
+    if (e.persisted) {
+      clearVisuals();
+      reset();
+      if (window.galleryScrollControl) window.galleryScrollControl.resume();
+    }
   });
 })();

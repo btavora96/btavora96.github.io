@@ -117,6 +117,15 @@ html.pt-transitioning {
   }
 }
 
+/* Stated on the root as well as on body. body's background does
+   propagate to the canvas, but only once there is a body to propagate
+   from — and a document's very first paint can land before that, which
+   is a frame of the browser's own white. Naming it here means the page
+   is never any colour but its own, from the first paint onwards. */
+html {
+  background: #ececee;
+}
+
 body {
   background: #ececee;
   color: #1a1a1a;
@@ -793,6 +802,25 @@ body {
   display: block;
 }
 
+/* The one moment in this whole movement where a fade describes what is
+   actually happening. After a swap the page underneath genuinely is the
+   next category — live, laid out, already decoded — so the covering
+   layer doesn't have to be cut away to reveal it. It dissolves off it.
+   Everywhere else a fade would only be hiding a gap. */
+.pt-layer.is-dissolving {
+  opacity: 0;
+  /* It is already only scenery by this point, and the live page is
+     underneath it — nothing here should be catching a click. */
+  pointer-events: none;
+  transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pt-layer.is-dissolving {
+    transition: none;
+  }
+}
+
 /* The leading edge carries a soft shadow so the incoming page reads as
    sitting above the one it's covering rather than butted against it —
    the single cue that most sells one surface passing over another. It
@@ -814,6 +842,49 @@ body {
      puts everything measured from it — not least where the banner comes
      to rest — out by exactly that margin. */
   display: flow-root;
+}
+
+/* Arriving at the end of a transition, the work settles the last few
+   pixels up into place as it fades in, so the page resolves rather than
+   simply switching on. Deliberately on the gallery alone: body carries
+   the banner, the back button and the floating panel, all of them
+   position:fixed, and a transform anywhere above them would make that
+   element their containing block — moving them for the length of the
+   animation and snapping them back at the end.
+
+   The travel is longer than the fade on purpose. The page is legible
+   well before it stops moving, so the tail is felt rather than waited
+   on, which is the difference between a settle and a delay. */
+html.pt-arrival .project-grid {
+  transform: translate3d(0, 14px, 0);
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Ends at `none`, not at a zeroed translate. An identity transform is
+   still a transform: it would leave the gallery a containing block and
+   a stacking context, and hold a composited layer open, for the whole
+   life of a page that has finished moving. `none` interpolates from a
+   translate exactly the same way. */
+html.pt-arrival body.page-ready .project-grid {
+  transform: none;
+}
+
+/* The next page, loaded and standing by to be adopted (see frameFor in
+   page-transition.js). Never shown — but sized to the real viewport,
+   because the nodes handed over carry the layout they were given here,
+   and laid out against a 10px box they would arrive measured for one.
+   visibility:hidden rather than display:none: a display:none frame
+   lays out nothing at all, and its images never load. */
+.pt-source {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: -1;
 }
 
 /* The surface that rises during a transition: the destination named on

@@ -74,8 +74,19 @@
     ":scope > .gallery-media > img, :scope > .gallery-media > .gallery-video, " +
     ":scope > .gallery-media > .gallery-frame-wrap";
 
-  // Where this run should settle.
+  // Where this run should settle, and whether it was reached by a swap
+  // rather than a page load.
   var pendingLanding = "top";
+  var softSwap = false;
+
+  // This page is loaded twice over: once as itself, and once inside the
+  // hidden frame page-transition.js keeps standing by so the next
+  // category can be handed over live instead of navigated to. In there
+  // it needs its layout and its snap alignment — those travel with the
+  // nodes — but nothing that costs a frame. A second gallery running its
+  // own scroll loop, out of sight, would be paid for by the one the
+  // reader is actually looking at.
+  var PREVIEW = location.search.indexOf("pt-preview") !== -1;
 
   // Scrolling *up* out of the top of a category walks back into the
   // previous one, and what the reader was shown during that gesture was
@@ -642,12 +653,13 @@
     // not a real one, and gets undone once. A genuine user scroll
     // (flagged the moment any input starts) is never touched.
     //
-    // Skipped when a landing position was chosen for us — arriving at a
-    // page's end from the one below it. The quirk this corrects belongs
-    // to parsing a fresh document at the top; anywhere else the watcher
-    // would just fight the deliberate position the transition set, since
-    // "not at zero" is precisely what it treats as the fault.
-    if (pendingLanding !== "bottom") {
+    // Skipped when a landing position was chosen for us — after a swap,
+    // or arriving at a page's end from the one below it. The quirk this
+    // corrects belongs to parsing a fresh document at the top; anywhere
+    // else the watcher would just fight the deliberate position the
+    // transition set, since "not at zero" is precisely what it treats as
+    // the fault.
+    if (!softSwap && pendingLanding !== "bottom") {
       var userInteracted = false;
       ["pointerdown", "wheel", "touchstart", "keydown"].forEach(function (type) {
         listen(window, type, function () { userInteracted = true; }, { once: true, passive: true });
@@ -1033,15 +1045,18 @@
     requestAnimationFrame(tick);
   }
 
-  function initCategoryPage() {
+  function initCategoryPage(options) {
     // Undo whatever a previous run left behind. On an ordinary page load
     // there is nothing to undo — this is what makes the whole setup safe
     // to run more than once, rather than something that assumes it owns
     // a fresh document.
     runCleanups();
 
-    pendingLanding = arrivalLanding === "bottom" ? "bottom" : "top";
+    options = options || {};
+    pendingLanding =
+      (options.landing || arrivalLanding) === "bottom" ? "bottom" : "top";
     arrivalLanding = null;
+    softSwap = !!options.softSwap;
 
     REVEAL_PAGE = document.body.classList.contains("project-reveal");
 
@@ -1068,16 +1083,27 @@
       galleryScrollControl.resume();
     });
 
-    wireVideoAutoplay();
     wireGalleryFrames();
+
+    // Everything below either runs every frame or pulls media over the
+    // wire. Standing by inside a hidden frame, this page needs neither:
+    // the snap alignment and measurements above travel with its nodes,
+    // and the loop starts for real the moment they become the page.
+    if (PREVIEW) return;
+
+    wireVideoAutoplay();
     wireSwipeBack();
     wireScrollFocus();
   }
 
-  document.addEventListener("DOMContentLoaded", initCategoryPage);
+  document.addEventListener("DOMContentLoaded", function () {
+    initCategoryPage();
+  });
 
-  // page-transition.js quiets the focus loop while a transition is in
-  // flight, so the gallery isn't tracking a scroll position the reader
-  // has already left behind.
+  // Called again by page-transition.js once another category's markup
+  // has been swapped in; galleryScrollControl quiets the focus loop
+  // while a transition is in flight, so the gallery isn't tracking a
+  // scroll position the reader has already left behind.
+  window.initCategoryPage = initCategoryPage;
   window.galleryScrollControl = galleryScrollControl;
 })();

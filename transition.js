@@ -12,11 +12,11 @@
   var MAX_READY_WAIT_MS = 2000;
 
   // page-transition.js hands off to a real navigation when it can't swap
-  // a page in place, and marks the destination so it knows not to fade:
-  // the previous page was already showing this one, full-screen, at the
-  // moment it left. Read synchronously — the flag has to be in place
-  // before the first paint, and stripped from the URL only once the page
-  // has settled, so anything else reading it still can.
+  // a page in place, and marks the destination so it knows this is the
+  // end of a movement rather than the start of a visit. Read
+  // synchronously — the flag has to be in place before the first paint,
+  // and stripped from the URL only once the page has settled, so
+  // anything else reading it still can.
   var ARRIVAL_FLAG = "pt-in";
   var arrival = new RegExp("(^|#)" + ARRIVAL_FLAG + "(=|$)").test(location.hash);
   if (arrival) document.documentElement.classList.add("pt-arrival");
@@ -49,8 +49,21 @@
     });
   }
 
+  // Deferred scripts run early enough that everything above can resolve
+  // before the browser has painted even once — and a transition applied
+  // to a document that hasn't been drawn yet has already finished by the
+  // time it is. Which is precisely how a fade turns back into a cut.
+  // Waiting out a frame puts the reveal after the first paint, so there
+  // is something on screen for it to happen to.
+  function afterFirstPaint() {
+    if (!arrival) return Promise.resolve();
+    return new Promise(function (resolve) {
+      requestAnimationFrame(function () { requestAnimationFrame(resolve); });
+    });
+  }
+
   Promise.race([
-    Promise.all([domReady(), bodyBackgroundReady()]),
+    Promise.all([domReady(), bodyBackgroundReady()]).then(afterFirstPaint),
     new Promise(function (resolve) { window.setTimeout(resolve, MAX_READY_WAIT_MS); })
   ]).then(markReady);
 
