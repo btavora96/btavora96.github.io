@@ -531,6 +531,11 @@ body {
   font-family: "Alte Haas Grotesk", sans-serif;
   font-size: 0.85rem;
   color: rgba(26, 26, 26, 0.6);
+  /* The descriptions are written in paragraphs, separated by newline
+     character references in the markup. pre-line keeps those breaks
+     while still collapsing ordinary runs of whitespace, so the text can
+     be paragraphed without each project needing its own elements. */
+  white-space: pre-line;
   max-height: 0;
   margin-top: 0;
   opacity: 0;
@@ -613,7 +618,12 @@ body {
   flex-direction: column;
   align-items: flex-start;
   gap: 0.6rem;
-  padding: 2.25rem 2.5rem;
+  /* Deeper on the right than the left, to keep the text clear of the
+     close button that docks into that edge when the card opens. Measured
+     rather than guessed: the button is 29px wide and sits 14px in, so
+     anything short of ~63px leaves the last words of a line running
+     underneath it — they were ending 2px past where it begins. */
+  padding: 2.25rem 4.25rem 2.25rem 2.5rem;
   text-align: left;
   /* Deliberately sheer — the artwork stays readable through the card.
      The heavier blur/saturation is what buys that transparency back in
