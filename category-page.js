@@ -709,6 +709,18 @@
     var easeStep = EASE;
     var slideEaseStep;
 
+    // After a swap, land on the focus values rather than easing into
+    // them. The loop normally chases its targets over about half a
+    // second, which is what gives the gallery its weight while
+    // scrolling — but a page that has just been swapped in starts from
+    // the stylesheet's defaults, where every project is equally sharp
+    // and equally bright. Easing from there means all ten of them
+    // settle, individually, in the half second the covering layer is
+    // dissolving: the reader sees the page changing underneath the fade
+    // and reads the whole thing as a flicker. Set outright on the first
+    // frame, the page is finished before it is uncovered.
+    var seedFocus = softSwap;
+
     // Converts a per-frame-at-60fps easing figure into the equivalent
     // fraction for however long this frame actually took.
     function easeAmount(perFrameAt60, dtSeconds) {
@@ -970,6 +982,15 @@
       if (galleryPaused) {
         requestAnimationFrame(tick);
         return;
+      }
+
+      // Deliberately below the pause check: this is spent the first time
+      // it is used, and a frame that returns early hasn't written
+      // anything to spend it on.
+      if (seedFocus) {
+        easeStep = 1;
+        slideEaseStep = 1;
+        seedFocus = false;
       }
 
       var vh = window.innerHeight;

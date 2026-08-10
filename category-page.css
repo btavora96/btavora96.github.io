@@ -798,8 +798,16 @@ body {
   transform: translate3d(0, 100%, 0);
 }
 
+/* Promoted here, when the layer first appears, and not later when it
+   starts to dissolve. Naming a property in will-change is what hands the
+   element its own compositor layer, and doing that at the same instant a
+   transition on that property begins means the promotion and the first
+   animated frame land together — which is a re-raster of a full-screen
+   surface exactly where it will be noticed. Opacity is named well before
+   anything animates it. */
 .pt-layer.is-active {
   display: block;
+  will-change: transform, opacity;
 }
 
 /* The one moment in this whole movement where a fade describes what is
@@ -815,7 +823,14 @@ body {
   /* Composite the fade rather than repainting a full-viewport surface
      against a gallery on every frame of it. This is the one property
      changing, and saying so is what keeps the curve smooth. */
-  will-change: opacity;
+  /* Lifting away rather than simply ceasing to be there. A surface that
+     only loses opacity reads as a light being turned down; the same
+     surface easing back at the same time reads as a veil being drawn off
+     the page, which is the thing actually happening. Small enough that
+     it is felt rather than seen — any more and it becomes an effect.
+     Motion gets the site's motion curve here, where opacity does not:
+     they are different quantities and the eye reads them differently. */
+  transform: scale(1.035);
   /* Evenly, not on the site's usual motion curve. That curve is right
      for things that travel — fast away, settling long — but applied to
      a crossfade it spends two thirds of the opacity in the first fifth
@@ -825,7 +840,8 @@ body {
      reads opacity more or less linearly, so this is close to linear,
      eased only at the two ends to keep it from starting or stopping
      abruptly. */
-  transition: opacity 460ms cubic-bezier(0.37, 0, 0.63, 1);
+  transition: opacity 560ms cubic-bezier(0.37, 0, 0.63, 1),
+              transform 720ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* The name goes before the ground it sits on. Fading them together
@@ -835,7 +851,7 @@ body {
    what is left to dissolve is a plain field over a finished page. */
 .pt-layer.is-dissolving .pt-strip-label {
   opacity: 0;
-  transition: opacity 240ms cubic-bezier(0.37, 0, 0.63, 1);
+  transition: opacity 320ms cubic-bezier(0.37, 0, 0.63, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -978,7 +994,13 @@ body {
    for one. Sized in em so it tracks the label rather than needing its
    own breakpoints, and nudged up off the baseline to sit optically
    centred against uppercase letterforms. */
+/* Turns with the gesture that is pulling the page up, not on a timer of
+   its own — so it is being turned by the reader rather than performing
+   at them. It points down while it is still an invitation, and has come
+   all the way about by the time the page it was pointing at has
+   arrived. inline-block because a plain inline box takes no transform. */
 .pt-strip-arrow {
+  display: inline-block;
   width: 0.6em;
   height: 0.85em;
   margin-left: 0.5em;
@@ -988,6 +1010,7 @@ body {
   stroke-width: 1.4;
   stroke-linecap: round;
   stroke-linejoin: round;
+  transform: rotate(calc(var(--pt-act2, 0) * 180deg));
 }
 
 /* Home's strip carries a sentence where the others carry a name, so it

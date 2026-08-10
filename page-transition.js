@@ -88,7 +88,7 @@
   var AUTO_STEP_AT = 0.62;
   var SETTLE_MS = 760;
   var COMMIT_MS = 420;      // the final rise, kept short — see commit()
-  var LAYER_DISSOLVE_MS = 460; // must match .pt-layer.is-dissolving
+  var LAYER_DISSOLVE_MS = 560; // must match .pt-layer.is-dissolving
   // px/ms of sustained push that completes regardless of distance.
   var FLICK_VELOCITY = 1.1;
   var VELOCITY_WINDOW_MS = 110;
@@ -561,6 +561,16 @@
     layer.style.transform = "translate3d(0," + (sign * offset).toFixed(2) + "px,0)";
     layer.style.setProperty("--pt-progress", reveal.toFixed(4));
 
+    // How far through the *second* act — the page being pulled up —
+    // rather than through the reveal as a whole. The strip spends the
+    // first act arriving and then sits still at the detent, so anything
+    // keyed to overall progress would already be part-way through
+    // before the reader has asked for it. Published separately so the
+    // arrow can turn with the gesture that is actually driving it.
+    var d = dockFraction();
+    var act2 = d < 1 ? clamp((reveal - d) / (1 - d), 0, 1) : 0;
+    layer.style.setProperty("--pt-act2", act2.toFixed(4));
+
     // The page underneath barely stirs while the banner is only being
     // announced, then gives way in earnest once it's actually being
     // pulled up. Because both are read off the same reveal, one runs
@@ -589,7 +599,7 @@
   // leaves out, while still going exactly where the hand says and no
   // further. A trackpad, which sends a continuous stream, barely notices
   // this is here at all.
-  var FOLLOW_PER_FRAME = 0.22; // fraction of the gap closed per frame at 60fps
+  var FOLLOW_PER_FRAME = 0.18; // fraction of the gap closed per frame at 60fps
   var SETTLED = 0.0008;        // close enough to stop drawing
 
   function startFollowing() {
@@ -686,6 +696,13 @@
   // The banner comes to rest against the bottom edge and stays there.
   // This is a real stopping place, not a waypoint: the reader can leave
   // it sitting, and only a further gesture takes it any further.
+  // Given an explicit curve rather than the default: expo puts almost
+  // all of its distance in the first instant, which on a movement this
+  // short is not deceleration, it is a snap with a tail. The strip
+  // should arrive at the detent the way something with weight comes to
+  // rest.
+  var DOCK_SETTLE_MS = 360;
+
   function settleToDock() {
     animateTo(dockFraction(), function () {
       docked = true;
@@ -697,7 +714,7 @@
       // and it is immediately before the moment that can least afford to
       // wait. Last chance to have the destination's pictures decoded.
       warmFrom(target);
-    });
+    }, DOCK_SETTLE_MS, easeOutCubic);
   }
 
   function revert() {
@@ -705,7 +722,7 @@
       clearVisuals();
       if (window.galleryScrollControl) window.galleryScrollControl.resume();
       reset();
-    });
+    }, 400, easeOutCubic);
   }
 
   // Marks the destination so it knows two things this navigation can't
@@ -843,6 +860,12 @@
     requestAnimationFrame(function () {
       requestAnimationFrame(function () {
         if (finished) return; // a new gesture got here first
+        // Hand the transform back to the stylesheet in the same breath
+        // as the class goes on. An inline transform outranks any rule,
+        // so the scale below would never apply while this was still set
+        // — and clearing it a moment earlier would drop the layer to its
+        // resting position off the bottom of the screen.
+        layer.style.transform = "";
         layer.classList.add("is-dissolving");
 
         // transitionend bubbles. The label inside fades on its own,
