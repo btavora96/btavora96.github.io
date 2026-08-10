@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://barbaratavora.com/sitemap.xml
+Sitemap: https://www.barbaratavora.com/sitemap.xml
