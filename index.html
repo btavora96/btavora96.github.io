@@ -21,14 +21,13 @@
        <head>, in parallel with CSS/JS, rather than discovering them one
        by one as it parses down through <body>. -->
 
-  <link rel="preload" as="image" href="assets/page-bg.webp" type="image/webp" fetchpriority="high" media="(min-width: 701px)" />
-  <link rel="preload" as="image" href="assets/page-bg-mob.webp" type="image/webp" fetchpriority="high" media="(max-width: 700px)" />
-  <link rel="preload" as="image" href="assets/keychains/BG.webp" imagesrcset="assets/keychains/BG-mob.webp 1000w, assets/keychains/BG.webp 1950w" imagesizes="(max-width: 600px) 88vw, 50vw" type="image/webp" fetchpriority="high" />
-  <link rel="preload" as="image" href="assets/keychains/BRANDING-KC.webp" imagesrcset="assets/keychains/BRANDING-KC-mob.webp 1000w, assets/keychains/BRANDING-KC.webp 1950w" imagesizes="(max-width: 600px) 88vw, 50vw" type="image/webp" fetchpriority="high" />
-  <link rel="preload" as="image" href="assets/keychains/SOCIAL-KC.webp" imagesrcset="assets/keychains/SOCIAL-KC-mob.webp 1000w, assets/keychains/SOCIAL-KC.webp 1950w" imagesizes="(max-width: 600px) 88vw, 50vw" type="image/webp" fetchpriority="high" />
-  <link rel="preload" as="image" href="assets/keychains/WEB-KC.webp" imagesrcset="assets/keychains/WEB-KC-mob.webp 1000w, assets/keychains/WEB-KC.webp 1950w" imagesizes="(max-width: 600px) 88vw, 50vw" type="image/webp" fetchpriority="high" />
-  <link rel="preload" as="image" href="assets/keychains/STAR-KC.webp" imagesrcset="assets/keychains/STAR-KC-mob.webp 1000w, assets/keychains/STAR-KC.webp 1950w" imagesizes="(max-width: 600px) 88vw, 50vw" type="image/webp" fetchpriority="high" />
-  <link rel="stylesheet" href="page.css?v=29" />
+  <link rel="preload" as="image" href="assets/page-bg.webp" type="image/webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="assets/keychains/BG.webp" type="image/webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="assets/keychains/BRANDING-KC.webp" type="image/webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="assets/keychains/SOCIAL-KC.webp" type="image/webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="assets/keychains/WEB-KC.webp" type="image/webp" fetchpriority="high" />
+  <link rel="preload" as="image" href="assets/keychains/STAR-KC.webp" type="image/webp" fetchpriority="high" />
+  <link rel="stylesheet" href="page.css?v=28" />
   <link rel="stylesheet" href="components/keychains/keychain-cluster.css?v=18" />
   <link rel="stylesheet" href="transition.css?v=6" />
   <noscript><style>body { opacity: 1 !important; }</style></noscript>
@@ -45,10 +44,10 @@
        rebuilding it. -->
   <div class="keychain-cluster">
     <div class="keychain-canvas">
-      <img class="kc-bg" src="assets/keychains/BG.webp" srcset="assets/keychains/BG-mob.webp 1000w, assets/keychains/BG.webp 1950w" sizes="(max-width: 600px) 88vw, 50vw" alt="" aria-hidden="true" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
+      <img class="kc-bg" src="assets/keychains/BG.webp" alt="" aria-hidden="true" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
 
       <a href="webdesign.html" class="kc-item" data-key="web" aria-label="Web Design — ver projetos">
-        <img class="kc-img" src="assets/keychains/WEB-KC.webp" srcset="assets/keychains/WEB-KC-mob.webp 1000w, assets/keychains/WEB-KC.webp 1950w" sizes="(max-width: 600px) 88vw, 50vw" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
+        <img class="kc-img" src="assets/keychains/WEB-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
         <span class="kc-glare" aria-hidden="true"></span>
       </a>
       <!-- Others is switched off while it has no projects. The tag stays
@@ -60,15 +59,15 @@
            keychain-cluster.js's TAGS, drop the noindex from other.html,
            and add the page to sitemap.xml. -->
       <a class="kc-item" data-key="star" aria-label="Others — em breve" aria-disabled="true">
-        <img class="kc-img" src="assets/keychains/STAR-KC.webp" srcset="assets/keychains/STAR-KC-mob.webp 1000w, assets/keychains/STAR-KC.webp 1950w" sizes="(max-width: 600px) 88vw, 50vw" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
+        <img class="kc-img" src="assets/keychains/STAR-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
         <span class="kc-glare" aria-hidden="true"></span>
       </a>
       <a href="branding.html" class="kc-item" data-key="branding" aria-label="Branding — ver projetos">
-        <img class="kc-img" src="assets/keychains/BRANDING-KC.webp" srcset="assets/keychains/BRANDING-KC-mob.webp 1000w, assets/keychains/BRANDING-KC.webp 1950w" sizes="(max-width: 600px) 88vw, 50vw" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
+        <img class="kc-img" src="assets/keychains/BRANDING-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
         <span class="kc-glare" aria-hidden="true"></span>
       </a>
       <a href="social.html" class="kc-item" data-key="social" aria-label="Social Media — ver projetos">
-        <img class="kc-img" src="assets/keychains/SOCIAL-KC.webp" srcset="assets/keychains/SOCIAL-KC-mob.webp 1000w, assets/keychains/SOCIAL-KC.webp 1950w" sizes="(max-width: 600px) 88vw, 50vw" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
+        <img class="kc-img" src="assets/keychains/SOCIAL-KC.webp" alt="" draggable="false" fetchpriority="high" decoding="async" width="1950" height="2925" />
         <span class="kc-glare" aria-hidden="true"></span>
       </a>
 

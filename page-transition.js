@@ -64,21 +64,6 @@
   // whose absence would be seen. See warmFrom.
   var FIRST_SCREEN_IMAGES = 5;
 
-  // Small screens are served narrower copies of every picture (see the
-  // srcset on each <img>), but nothing this file asks for by hand goes
-  // through srcset — an Image() built in script takes the URL it is
-  // given. Left alone, warming the next category downloaded the desktop
-  // originals on a phone: measured on Web Design, that was Social's
-  // pictures at full size fetched while the reader was still looking at
-  // Web Design.
-  var wantsSmall = window.matchMedia &&
-    window.matchMedia("(max-width: 700px)").matches;
-
-  function variantFor(src) {
-    if (!wantsSmall || !src) return src;
-    return /\.webp$/.test(src) ? src.replace(/\.webp$/, "-mob.webp") : src;
-  }
-
   // The reveal happens in two acts rather than one long drag.
   //
   // First, over-scrolling past the last project lifts the next
@@ -232,19 +217,6 @@
 
   function frameFor(href) {
     if (!href || href === "index.html" || frames[href]) return;
-    // Not on a phone. This frame exists so the next category can be
-    // handed over as live nodes instead of navigated to, and it pays for
-    // that by loading a whole second page — markup, stylesheets, and its
-    // opening pictures — before the reader has shown any sign of going
-    // there. On a desktop connection that is a fair trade. On a phone it
-    // is most of a megabyte of someone's data spent on a maybe, and it
-    // is the largest single thing standing between them and the page
-    // they actually asked for.
-    //
-    // Without a frame the handover is an ordinary navigation, which is
-    // the same route this took over file:// for months, and the arrival
-    // flag on the URL is what keeps it from looking like a reload.
-    if (wantsSmall) return;
     var frame = document.createElement("iframe");
     frame.className = "pt-source";
     frame.setAttribute("aria-hidden", "true");
@@ -297,16 +269,7 @@
   // fetch and decode that after the navigation leaves the reader looking
   // at the layer's dark field for exactly as long as it takes. Read from
   // page.css, which is not ours to change but is ours to keep up with.
-  // Which of the two the home page will actually use is decided by the
-  // same 700px query page.css uses, so warming the other one would be
-  // two megabytes fetched on a phone to prime a cache entry nothing
-  // will ever read.
-  var HOME_BACKDROP = [
-    (window.matchMedia && window.matchMedia("(max-width: 700px)").matches)
-      ? "assets/page-bg-mob.webp"
-      : "assets/page-bg.webp",
-    "assets/grain.svg"
-  ];
+  var HOME_BACKDROP = ["assets/page-bg.webp", "assets/grain.svg"];
 
   // Used only where the frame can't be read — see warmFrom.
   var FALLBACK_IMAGES = {
@@ -330,7 +293,7 @@
       warmed[href] = true;
       HOME_BACKDROP.forEach(function (src) {
         var warm = new Image();
-        warm.src = src;   // já escolhido por ecrã na própria lista
+        warm.src = src;
         if (warm.decode) warm.decode().catch(function () {});
       });
       return;
@@ -342,12 +305,7 @@
         .call(doc.querySelectorAll(".gallery-item img"), 0, FIRST_SCREEN_IMAGES)
         .map(function (img) { return img.getAttribute("src"); });
     } else {
-      // On a phone there is deliberately no frame (see frameFor), so
-      // there is nothing to wait for and the named list below is the
-      // only list there will ever be — one narrow picture per
-      // destination, which is what keeps the arrival from landing on
-      // bare ground without paying for a second page.
-      if (!wantsSmall && !loaded[href]) return; // still coming; there will be another chance
+      if (!loaded[href]) return; // still coming; there will be another chance
       // The frame loaded and still can't be read, so the page's own
       // markup is out of reach and the opening pictures have to be named
       // here. Warming them is what stops the navigation that follows
@@ -359,7 +317,7 @@
     list.forEach(function (src) {
       if (!src) return;
       var warm = new Image();
-      warm.src = variantFor(src);
+      warm.src = src;
       if (warm.decode) warm.decode().catch(function () {});
     });
   }

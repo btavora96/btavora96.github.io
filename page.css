@@ -62,22 +62,6 @@ body {
     radial-gradient(ellipse 85% 75% at 50% 45%, transparent 55%, rgba(8, 7, 6, 0.5) 100%),
     radial-gradient(circle at 76% 20%, rgba(255, 232, 205, 0.08), transparent 55%),
     url("assets/page-bg.webp");
-
-  /* A fotografia de fundo tem 5400px de largura e 1,9 MB — para um ecrã
-     de 375px. A versão reduzida tem 166 KB e no telemóvel é
-     indistinguível: é a mesma imagem esticada por trás do conteúdo, e
-     nenhum ecrã de telefone tem resolução para mostrar a diferença.
-     Declarada como regra separada em vez de image-set() para não
-     depender de suporte, e para o browser só descarregar uma das duas. */
-}
-
-@media (max-width: 700px) {
-  body {
-    background-image:
-      url("assets/grain.svg"),
-      radial-gradient(ellipse 85% 75% at 50% 45%, transparent 55%, rgba(8, 7, 6, 0.5) 100%),
-      radial-gradient(circle at 76% 20%, rgba(255, 232, 205, 0.08), transparent 55%),
-      url("assets/page-bg-mob.webp");
   background-repeat: repeat, no-repeat, no-repeat, no-repeat;
   background-size: 200px 200px, 100% 100%, 100% 100%, 130% auto;
   background-position: 0 0, center, center, center;
