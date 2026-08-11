@@ -1152,6 +1152,23 @@
       });
     listen(document, "focusin", wake, { passive: true });
 
+    // And the route that isn't an interaction at all: the page changing
+    // shape by itself. A lazily-decoded image finally sizing its box, a
+    // web font swapping in and reflowing a caption — each moves the
+    // targets without the reader doing anything, and every listener
+    // above would sleep through it. The loop would then be holding
+    // values computed against a layout that no longer exists, with
+    // nothing scheduled to notice. Watching the tracked elements
+    // themselves costs nothing while nothing moves: unlike a poll, a
+    // ResizeObserver only speaks when there is something to say.
+    if (window.ResizeObserver) {
+      var sizeWatch = new ResizeObserver(wake);
+      entries.forEach(function (entry) {
+        sizeWatch.observe(entry.media);
+      });
+      onCleanup(function () { sizeWatch.disconnect(); });
+    }
+
     function tick() {
       if (myLoopToken !== loopToken) return;
       var frameNow = performance.now();
@@ -1204,7 +1221,29 @@
         // by the two, and then animate to a rest position it was never
         // snapped to.
         var isTall = entry.item.classList.contains("gallery-item--tall");
-        var targets = focusTargetsFor(rect.top, rect.height, vh, isTall, entry.startAligned);
+
+        // Same hazard, and it used to be here: getBoundingClientRect
+        // reports the *painted* box, so it carries the scale and the
+        // translateY this effect is applying right now. Feeding that
+        // back in makes the target a function of the value it is the
+        // target for, and a feedback loop like that has fixed points
+        // that are not the answer — a project could sit at scale 1.020
+        // reporting itself perfectly settled when it was heading for
+        // 1.035, and the sleep check below, seeing nothing left to do,
+        // would stop the loop there. Blurred, at rest, with nothing
+        // scheduled to ever correct it. That is what made the last
+        // project of a page look permanently half-arrived: it is the
+        // one you stop scrolling at, so it is the one where no later
+        // event happened to wake the loop back up.
+        //
+        // The layout box is recovered from the painted one instead. No
+        // extra measurement is needed for it: the scale is uniform and
+        // about the default centre origin, so the centre only moves by
+        // the translateY, and the height only differs by the scale.
+        var appliedScale = entry.cur.scale || 1;
+        var layoutHeight = rect.height / appliedScale;
+        var layoutTop = rect.top + rect.height / 2 - entry.cur.y - layoutHeight / 2;
+        var targets = focusTargetsFor(layoutTop, layoutHeight, vh, isTall, entry.startAligned);
         var focus = targets.focus;
         var yTarget = targets.y;
 
