@@ -548,9 +548,18 @@
         // Recorded for the focus effect, which has to measure each item
         // against the position it actually comes to rest at — see
         // focusAnchor in tick().
-        entry.startAligned = isFirst || isTall;
+        // Being first is no longer a reason on its own. It used to be:
+        // a centred rest is a scroll position, and the first project
+        // had no room above it to reach one, so it was parked against
+        // the top margin instead and sat visibly higher than every
+        // other project on the page. applyEdgeSpacing now gives it that
+        // room, exactly as it has always given the last project the
+        // room it needs below itself. Height is the only thing that
+        // still forces a top alignment, because a piece taller than the
+        // viewport has no centre to rest at.
+        entry.startAligned = isTall;
 
-        if (isFirst || isTall) {
+        if (isTall) {
           // Both stop with their top edge a fixed distance below the
           // banner — the same distance, every time. Tall pieces used to
           // get scrollMarginTop 0 here, which parked each one hard
@@ -630,11 +639,31 @@
         ? Math.max(STAGE_TWO_GAP_PX, vh - TOP_SPACING_PX - lastHeight)
         : Math.max(0, (vh - lastHeight) / 2);
 
+      // The same thing at the other end, and for the same reason. A
+      // short project rests centred — and with scroll-margin-top equal
+      // to the banner, "centred" means its middle sits half a banner
+      // below the viewport's middle (see applySnapAlignment). For the
+      // first project that rest has to be reachable at scroll position
+      // zero, since there is nothing above it to scroll through, so the
+      // grid has to open with exactly that much space. Without it the
+      // page simply runs out of room and the first project sits high —
+      // 63px above centre on Web Design, which is what made 361 Retail
+      // look misaligned against every project under it.
+      //
+      // Never less than the back button's own clearance, and not
+      // applicable to a tall first piece, which is top-aligned anyway.
+      var firstItem = entries[0].item;
+      var firstHeight = firstItem.offsetHeight;
+      var firstIsTall = firstItem.classList.contains("gallery-item--tall");
+      var topNeeded = firstIsTall
+        ? TOP_SPACING_PX
+        : Math.max(TOP_SPACING_PX, Math.round(vh / 2 + bannerHeight / 2 - firstHeight / 2));
+
       // …and on top of that, a deliberate margin so the final project
       // has room to breathe rather than ending flush with the page.
       var breathingRoom = Math.max(7 * rootFontSize, Math.round(vh * 0.16));
 
-      grid.style.marginTop = TOP_SPACING_PX + "px";
+      grid.style.marginTop = topNeeded + "px";
       grid.style.paddingBottom = Math.round(reachNeeded + breathingRoom) + "px";
     }
     applyEdgeSpacing();
