@@ -422,6 +422,37 @@
   var BOTTOM_SLACK = 340;
   var TOP_SLACK = 60;
 
+  // …but only where snapping is actually on. It is off on touch (see the
+  // pointer rule in category-page.css), and there the end of the
+  // document is an ordinary scroll position the reader can sit at
+  // exactly. Keeping 340px of slack on a phone would mean the page
+  // declares itself finished while the last project has only just
+  // appeared at the bottom of the screen — measured at 375x812, that is
+  // 340px before the end with the last project's top still at 568 — so
+  // the next drag would carry the reader into the following category
+  // before they had seen it at all.
+  //
+  // Read from the page rather than assumed, so this can't quietly
+  // disagree with the stylesheet, and re-read on resize because the rule
+  // that decides it is a media query.
+  // Not zero: a phone's scroll position and its maximum are both
+  // subject to device-pixel rounding, and a test that demands the exact
+  // end can fail by a pixel and leave the reader with no way forward at
+  // all. Twenty-four is far below the height of a project — the last one
+  // is fully in view long before this — while sitting well clear of
+  // rounding noise.
+  var END_TOLERANCE = 24;
+  var pageSnaps = true;
+
+  function readSnapMode() {
+    var snap = getComputedStyle(document.documentElement).scrollSnapType;
+    pageSnaps = !!snap && snap !== "none";
+  }
+
+  function bottomSlack() {
+    return pageSnaps ? BOTTOM_SLACK : END_TOLERANCE;
+  }
+
   // Rest used to be counted in frames by a requestAnimationFrame loop
   // that ran for the entire life of the page — every frame, forever,
   // to answer a question that only matters at the two moments the
@@ -436,13 +467,16 @@
     lastScrollAt = performance.now();
   }, { passive: true });
 
+  readSnapMode();
+  window.addEventListener("resize", readSnapMode, { passive: true });
+
   function atRest() {
     return performance.now() - lastScrollAt >= REST_MS;
   }
 
   function atBottom() {
     var max = document.documentElement.scrollHeight - window.innerHeight;
-    return atRest() && window.scrollY >= max - BOTTOM_SLACK;
+    return atRest() && window.scrollY >= max - bottomSlack();
   }
 
   function atTop() {
