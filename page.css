@@ -1,5 +1,15 @@
 /* Shared page shell — dark background + basic typography for every page
    in the site (the keychains demo and the 4 category pages). */
+/* Alturas de ecrã: `svh` em vez de `vh` em tudo o que posiciona ou
+   espaça conteúdo que rola.
+   No telemóvel a barra de endereço esconde-se e reaparece durante o
+   scroll, e `vh` acompanha-a — medido, uma variação de 67px na altura
+   do ecrã deslocava todos os projectos 30 a 37px e mexia na posição do
+   scroll, a meio do gesto, com o snap obrigatório a re-resolver por
+   cima. `svh` é medido com a barra visível e não muda depois disso, por
+   isso o layout deixa de depender de uma coisa que se mexe sozinha.
+   O `vh` fica declarado antes de cada um como recurso para browsers que
+   não conheçam a unidade nova. */
 
 /* Page-to-page fade: see transition.css/transition.js (shared across all
    5 pages) — a plain JS-driven opacity crossfade instead of the
@@ -31,6 +41,7 @@ html, body {
   padding: 0;
   width: 100vw;
   min-height: 100vh;
+  min-height: 100svh;
 }
 
 body {
@@ -166,6 +177,7 @@ body.kc-settled .contact-box {
 
 .hello-box {
   top: 16vh;
+  top: 16svh;
   left: 60px;
 }
 
@@ -195,6 +207,7 @@ body.kc-settled .contact-box {
 .contact-box {
   right: 60px;
   bottom: 13vh;
+  bottom: 13svh;
   display: flex;
   flex-direction: column;
   align-items: flex-end;

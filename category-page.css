@@ -1,6 +1,16 @@
 /* Category project pages (Branding / Social / Web Design / Other) — light
    theme, scrollable grid of project thumbnails, separate from the dark
    keychain-cluster home page which keeps its own page.css. */
+/* Alturas de ecrã: `svh` em vez de `vh` em tudo o que posiciona ou
+   espaça conteúdo que rola.
+   No telemóvel a barra de endereço esconde-se e reaparece durante o
+   scroll, e `vh` acompanha-a — medido, uma variação de 67px na altura
+   do ecrã deslocava todos os projectos 30 a 37px e mexia na posição do
+   scroll, a meio do gesto, com o snap obrigatório a re-resolver por
+   cima. `svh` é medido com a barra visível e não muda depois disso, por
+   isso o layout deixa de depender de uma coisa que se mexe sozinha.
+   O `vh` fica declarado antes de cada um como recurso para browsers que
+   não conheçam a unidade nova. */
 
 /* Page-to-page fade: see transition.css/transition.js (shared across all
    5 pages) — a plain JS-driven opacity crossfade instead of the
@@ -59,6 +69,7 @@ html, body {
   padding: 0;
   width: 100vw;
   min-height: 100vh;
+  min-height: 100svh;
 }
 
 /* Each gallery item is its own section, so scrolling settles onto one
@@ -84,6 +95,31 @@ html {
      category-page.js all pass their own explicit `behavior`, so none of
      them are affected by this. */
   scroll-behavior: smooth;
+}
+
+/* And switched off entirely on a phone, where it costs more than it
+   buys.
+
+   A snap point aligned to `center` is a scroll position derived from
+   the viewport's height. On a desktop that height is a constant. On a
+   phone it is not: the address bar hides as you scroll down and returns
+   as you scroll up, and every toggle moves the centre, so mandatory
+   snap re-resolves and yanks the page to a new position in the middle
+   of the gesture that caused it. Measured here, at 375x812 with the bar
+   toggling: the scroll position jumped 30px and every project moved
+   37px. `proximity` measured identically — the alignment is the
+   problem, not the strictness. With snapping off both numbers fall to
+   zero, and what is left is ordinary momentum scrolling, which is what
+   a thumb expects anyway.
+
+   Nothing is lost that a phone had: the focus effect still reads
+   whichever project is nearest the middle and brings it forward, so
+   scrolling still settles the reader onto one project at a time. It
+   simply stops being forced. */
+@media (hover: none) and (pointer: coarse) {
+  html {
+    scroll-snap-type: none;
+  }
 }
 
 /* While a project's info panel is open (see wireToggle in
@@ -270,6 +306,7 @@ body {
      dead space between projects, and on a tall one it barely
      registered. The clamp keeps it sane at both extremes. */
   margin-bottom: clamp(7rem, 16vh, 11rem);
+  margin-bottom: clamp(7rem, 16svh, 11rem);
   text-align: center;
   /* Centers the *whole* item — image and caption/button together, as
      one section — not just the image with the caption excluded (see
@@ -582,6 +619,7 @@ body {
      of silently clipping or forcing the whole gallery to fight the
      reader for space. */
   max-height: min(45vh, 26rem);
+  max-height: min(45svh, 26rem);
   overflow-y: auto;
   margin-top: 0.5rem;
 }
@@ -633,6 +671,7 @@ body {
   right: 2.5rem;
   width: min(60%, 26rem);
   max-height: 70vh;
+  max-height: 70svh;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -685,6 +724,7 @@ body {
 .gallery-textpanel--floating .gallery-subtitle {
   max-width: none;
   max-height: min(55vh, 28rem);
+  max-height: min(55svh, 28rem);
   margin-top: 0;
   opacity: 1;
   transform: none;
@@ -796,6 +836,7 @@ body {
      on a typical device. */
   body.project-reveal .gallery-item {
     margin-bottom: clamp(48px, 6vh, 55px);
+    margin-bottom: clamp(48px, 6svh, 55px);
   }
 
   /* Replaced here by a sideways swipe — see wireSwipeBack in
@@ -1204,6 +1245,7 @@ body {
   opacity: 1;
   transform: translateY(0);
   max-height: min(45vh, 26rem);
+  max-height: min(45svh, 26rem);
   overflow-y: auto;
   margin-top: 0.5rem;
 }

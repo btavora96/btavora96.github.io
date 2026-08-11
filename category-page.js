@@ -61,6 +61,36 @@
     }
   }
 
+  // On a phone the address bar hides as you scroll down and comes back
+  // as you scroll up, and each toggle fires `resize` with a different
+  // window.innerHeight — around 67px of it on a typical device. Anything
+  // that recomputes layout from that height then moves the page under
+  // the reader in the middle of their gesture: measured on this site,
+  // every project shifted 30 to 37px and the scroll position went with
+  // them, while mandatory snap re-resolved on top of the shift. That is
+  // one of the things that made scrolling here feel broken on a phone,
+  // and no amount of care inside the layout code could have helped,
+  // because the input it was given was the thing that was wrong.
+  //
+  // A phone's viewport width doesn't change on its own. Rotating changes
+  // both dimensions; browser chrome changes only the height. So on a
+  // touch device a resize that leaves the width alone is chrome, and is
+  // ignored. Where there is a real pointer, a height-only resize is
+  // someone dragging the window shorter, which is real and is honoured.
+  var isTouchViewport = window.matchMedia &&
+    window.matchMedia("(hover: none) and (pointer: coarse)");
+
+  function onLayoutResize(fn) {
+    var lastWidth = window.innerWidth;
+    listen(window, "resize", function () {
+      var width = window.innerWidth;
+      var widthChanged = width !== lastWidth;
+      lastWidth = width;
+      if (!widthChanged && isTouchViewport && isTouchViewport.matches) return;
+      fn();
+    });
+  }
+
   // Bumped on every teardown; the focus loop checks it each frame and
   // simply stops rather than animating a gallery that no longer exists.
   var loopToken = 0;
@@ -546,7 +576,7 @@
       });
     }
     applySnapAlignment();
-    listen(window, "resize", applySnapAlignment);
+    onLayoutResize(applySnapAlignment);
 
     // Lazy images/videos (most of them) report 0 height until loaded,
     // which would misclassify a genuinely tall piece as short. Nothing
@@ -608,7 +638,7 @@
       grid.style.paddingBottom = Math.round(reachNeeded + breathingRoom) + "px";
     }
     applyEdgeSpacing();
-    listen(window, "resize", applyEdgeSpacing);
+    onLayoutResize(applyEdgeSpacing);
 
     // The last item's own height feeds directly into the bottom buffer
     // above — if it's a lazy-loaded image (most are), it still reports
@@ -864,6 +894,24 @@
     // center, the goal is for the project to already read as sharp/focused
     // by the time it's settling into place, not just once it's dead still.
     var FOCUS_SPAN_FACTOR = 0.6;
+    // How out of focus an out-of-focus project gets. On a desktop the
+    // page snaps, so at rest there is always one project at exactly zero
+    // and the soft ones around it read as depth — something is sharp, so
+    // the rest is obviously meant to be soft. A phone doesn't snap, so
+    // it can rest between two projects with nothing at zero, and at that
+    // point 1.6px across a small screen stops reading as depth and
+    // starts reading as an image that never finished loading. Two thirds
+    // of it keeps the same cue without ever looking like a fault.
+    var MAX_BLUR_PX = (window.matchMedia &&
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches) ? 0.7 : 1.6;
+
+    // How much of that span counts as "arrived" — see focusTargetsFor.
+    // Zero wherever the page snaps, so the curve there is untouched;
+    // on touch it is the width of the band in which a project is fully
+    // sharp, and 0.22 of the span works out around 140px on a phone,
+    // which is roughly a thumb's worth of imprecision.
+    var FOCUS_PLATEAU = (window.matchMedia &&
+      window.matchMedia("(hover: none) and (pointer: coarse)").matches) ? 0.22 : 0;
     // For the tall, two-stop pieces (see applySnapAlignment): how much
     // of stage two (bottom of the artwork + caption) needs to have
     // scrolled into view before the piece counts as "released" —
@@ -898,7 +946,23 @@
         : vh / 2 + bannerHeight / 2;
       var span = (vh / 2 + height / 2) * FOCUS_SPAN_FACTOR;
       var dist = span > 0 ? clamp((centre - anchor) / span, -1, 1) : 0;
-      return { focus: smoothstep(clamp(1 - Math.abs(dist), 0, 1)), y: dist * -18 };
+      // Full focus at exactly one scroll position is fine where the page
+      // is guaranteed to stop at exactly that position. Scroll-snap does
+      // that on a desktop, so a project there lands on its anchor and is
+      // properly sharp. A phone has no snapping (see the touch rule in
+      // category-page.css) and so stops wherever the thumb left it,
+      // which is essentially never the anchor — leaving whatever the
+      // reader is looking at permanently a little soft, and reading as a
+      // page that failed to finish loading rather than as depth.
+      //
+      // So on touch the peak becomes a plateau: anything within this
+      // fraction of the span counts as arrived. FOCUS_PLATEAU is 0
+      // elsewhere, where `reach` reduces to Math.abs(dist) and the curve
+      // is exactly what it was.
+      var reach = FOCUS_PLATEAU > 0
+        ? Math.max(0, (Math.abs(dist) - FOCUS_PLATEAU) / (1 - FOCUS_PLATEAU))
+        : Math.abs(dist);
+      return { focus: smoothstep(clamp(1 - reach, 0, 1)), y: dist * -18 };
     }
 
     // What a given focus value looks like. Kept beside the formula so
@@ -910,7 +974,7 @@
         opacity: lerp(0.78, 1, focus),
         brightness: lerp(0.96, 1.02, focus),
         contrast: lerp(0.97, 1.03, focus),
-        blur: lerp(1.6, 0, focus),
+        blur: lerp(MAX_BLUR_PX, 0, focus),
         shadowBlur: lerp(14, 30, focus),
         shadowAlpha: lerp(0.07, 0.17, focus)
       };
@@ -1000,7 +1064,7 @@
     }
     if (REVEAL_PAGE) {
       updateFloatingHorizontal();
-      listen(window, "resize", updateFloatingHorizontal);
+      onLayoutResize(updateFloatingHorizontal);
     }
 
     // Vertically the control belongs to whichever project is active, so
