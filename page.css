@@ -336,3 +336,29 @@ body.kc-settled .contact-box {
     font-size: 0.95rem;
   }
 }
+
+
+/* --------------------------------------------------------------------
+   Fundo em versão leve no telemóvel.
+
+   A fotografia tem 5400px de largura e 1,9 MB, para ecrãs que a mostram
+   a 375. A cópia reduzida tem 166 KB e é indistinguível: está esticada
+   por trás do conteúdo e nenhum ecrã de telefone tem resolução para
+   mostrar a diferença.
+
+   Bloco acrescentado no fim do ficheiro, e não dentro da regra do body.
+   Uma tentativa anterior editou essa regra a meio e fechou-a cedo, o que
+   atirou o tipo de letra, a cor do texto e o dimensionamento do fundo
+   para dentro de uma media query — em ecrãs largos o site perdeu-os
+   todos. Aqui não há como isso acontecer: a regra do body fica intacta,
+   e isto só pode acrescentar-lhe uma propriedade abaixo dos 700px.
+   -------------------------------------------------------------------- */
+@media (max-width: 700px) {
+  body {
+    background-image:
+      url("assets/grain.svg"),
+      radial-gradient(ellipse 85% 75% at 50% 45%, transparent 55%, rgba(8, 7, 6, 0.5) 100%),
+      radial-gradient(circle at 76% 20%, rgba(255, 232, 205, 0.08), transparent 55%),
+      url("assets/page-bg-mob.webp");
+  }
+}
