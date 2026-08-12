@@ -85,11 +85,24 @@
   // the cursor together. Tightening the response is what brings that
   // "everything shifts together" feel back while keeping each tag's
   // own relative character (still four different speeds/weights).
+  // Rigidez e amortecimento subidos juntos, em 6.25x e 2.5x.
+  //
+  // Numa mola o tempo até assentar é proporcional a 1/(ζ·ω), onde
+  // ω=√(k/m) e ζ=c/(2√(km)). Subir k em 6.25 e c em 2.5 deixa ζ
+  // exactamente igual — mesma forma de movimento, mesmo ressalto, mesma
+  // diferença de carácter entre as quatro etiquetas — e torna ω 2.5x
+  // maior, portanto tudo acontece em 40% do tempo.
+  //
+  // Foi medido antes de mudar: depois de um único movimento do rato, o
+  // conjunto ainda estava a mexer-se ao fim de 1,5 segundos, com a
+  // inclinação de uma etiqueta ainda a subir. Isso não se lê como peso,
+  // lê-se como atraso — a mão já saiu de lá e o objecto ainda está a
+  // responder ao sítio onde ela esteve.
   var SPRINGS = {
-    web: { mass: 1.05, stiffness: 60, damping: 10.5, sensitivity: 2.1, idleAmp: 0.4, idlePeriod: 5.4, idlePhase: 0.6, kick: 6, entryDelayMs: 50 },
-    star: { mass: 0.9, stiffness: 68, damping: 9.3, sensitivity: 2.5, idleAmp: 0.45, idlePeriod: 4.7, idlePhase: 2.1, kick: -7, entryDelayMs: 160 },
-    branding: { mass: 1.4, stiffness: 42, damping: 11, sensitivity: 1.5, idleAmp: 0.3, idlePeriod: 6.6, idlePhase: 3.4, kick: 4.5, entryDelayMs: 270 },
-    social: { mass: 0.72, stiffness: 84, damping: 8.5, sensitivity: 2.9, idleAmp: 0.5, idlePeriod: 3.9, idlePhase: 1.2, kick: -8.5, entryDelayMs: 380 }
+    web: { mass: 1.05, stiffness: 375, damping: 26.25, sensitivity: 2.1, idleAmp: 0.4, idlePeriod: 5.4, idlePhase: 0.6, kick: 6, entryDelayMs: 50 },
+    star: { mass: 0.9, stiffness: 425, damping: 23.25, sensitivity: 2.5, idleAmp: 0.45, idlePeriod: 4.7, idlePhase: 2.1, kick: -7, entryDelayMs: 160 },
+    branding: { mass: 1.4, stiffness: 262.5, damping: 27.5, sensitivity: 1.5, idleAmp: 0.3, idlePeriod: 6.6, idlePhase: 3.4, kick: 4.5, entryDelayMs: 270 },
+    social: { mass: 0.72, stiffness: 525, damping: 21.25, sensitivity: 2.9, idleAmp: 0.5, idlePeriod: 3.9, idlePhase: 1.2, kick: -8.5, entryDelayMs: 380 }
   };
 
   /**
@@ -137,8 +150,8 @@
     // mouse." Every tag's own sway (below) is driven off this same
     // signal, so its livelier motion propagates through the whole
     // group instead of staying isolated to the cluster shell.
-    var CARABINER_STIFFNESS = 36;
-    var CARABINER_DAMPING = 8.2;
+    var CARABINER_STIFFNESS = 225;   // 36 * 6.25 — ver a nota em SPRINGS
+    var CARABINER_DAMPING = 20.5;    // 8.2 * 2.5, para ζ ficar igual
     var carX = { pos: 0, vel: 0 };
     var carY = { pos: 0, vel: 0 };
 
@@ -176,7 +189,10 @@
       var t = (now - start) / 1000;
       // clamp so a dropped frame (tab backgrounded, etc.) can't jolt
       // the spring integration with a huge one-off dt
-      var dt = Math.min((now - last) / 1000, 0.05);
+      // Duas frames, não três: com molas mais rígidas um salto de 50ms
+      // integrado de uma vez dá um solavanco visível ao voltar de um
+      // separador em segundo plano.
+      var dt = Math.min((now - last) / 1000, 0.033);
       last = now;
 
       // idle float — slow, independent of the pointer; two different
