@@ -390,18 +390,42 @@
     // in page.css) still carries the actual fade/rise, so it isn't
     // instant, just no longer delayed.
     var allImgs = [bg].concat(items.map(function (entry) { return entry.img; }));
-    Promise.all(allImgs.map(function (img) {
+    var decoded = Promise.all(allImgs.map(function (img) {
       if (img.decode) return img.decode().catch(function () {});
       if (img.complete) return Promise.resolve();
       return new Promise(function (resolve) {
         img.addEventListener("load", resolve, { once: true });
         img.addEventListener("error", resolve, { once: true });
       });
-    })).then(function () {
+    }));
+
+    // …but never for longer than this.
+    //
+    // The gate above is right in principle: five pictures decoding at
+    // their own pace and appearing one by one looked like a race rather
+    // than an arrival. What it lacked was a ceiling. Measured here, the
+    // five images are 28.5 megapixels between them and took five
+    // seconds to all finish decoding — five seconds in which the
+    // document was loaded, laid out, and showing nothing at all.
+    //
+    // So the wait is now a race the pictures can lose. Ready in time and
+    // nothing changes; slow, and the carabiner arrives on schedule with
+    // the tags following as they decode. Less perfect, and far better
+    // than an empty screen. This is not a delay added to pace anything —
+    // it is a deadline on a wait that already existed and had no end.
+    var REVEAL_DEADLINE_MS = 700;
+
+    function revealCluster() {
+      if (canvas.classList.contains("kc-ready")) return;
       canvas.classList.add("kc-ready");
       heroMotion.kick();
       document.body.classList.add("kc-settled");
-    });
+    }
+
+    Promise.race([
+      decoded,
+      new Promise(function (resolve) { setTimeout(resolve, REVEAL_DEADLINE_MS); })
+    ]).then(revealCluster);
 
     // optional "you are here": set data-current-key="branding" (etc) on the
     // host when this component is embedded on one of the category pages,

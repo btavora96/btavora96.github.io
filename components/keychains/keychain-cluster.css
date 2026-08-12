@@ -53,6 +53,16 @@
   }
 }
 
+/* Tempos de entrada, reduzidos para cerca de metade.
+   Medido antes: a página ficava carregada aos 553ms e só terminava de
+   se montar 1080ms depois — a última etiqueta a acabar de aparecer a
+   um segundo e meio da chegada. É a primeira coisa que alguém vê, e
+   demorava demasiado a estar lá.
+   A coreografia é a mesma: mosquetão primeiro, depois as quatro
+   etiquetas uma a uma, na mesma ordem e com o desfasamento reduzido na
+   mesma proporção. Só o relógio anda mais depressa. Última etiqueta
+   agora aos 610ms em vez de 1080. */
+
 /* static base — carabiner, ring & keys. Never animates. */
 .kc-bg {
   position: absolute;
@@ -68,7 +78,7 @@
   /* entrance, stage 1: the carabiner — heavy, fixed, arrives first and
      plainly (a fade only, no motion, since it "barely moves"). */
   opacity: 0;
-  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .keychain-canvas.kc-ready .kc-bg {
@@ -99,7 +109,7 @@
   --kc-sway: 0deg;
   opacity: 0;
   transform: rotate(var(--kc-sway));
-  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .keychain-canvas.kc-ready .kc-item {
@@ -115,7 +125,7 @@
   transform-origin: 68.6% 40.1%;
 }
 .kc-item[data-key="web"] {
-  transition-delay: 0.05s;
+  transition-delay: 0.03s;
 }
 
 .kc-item[data-key="star"],
@@ -123,7 +133,7 @@
   transform-origin: 20.5% 41.4%;
 }
 .kc-item[data-key="star"] {
-  transition-delay: 0.16s;
+  transition-delay: 0.09s;
 }
 
 .kc-item[data-key="branding"],
@@ -131,7 +141,7 @@
   transform-origin: 28.4% 34.1%;
 }
 .kc-item[data-key="branding"] {
-  transition-delay: 0.27s;
+  transition-delay: 0.15s;
 }
 
 .kc-item[data-key="social"],
@@ -139,7 +149,7 @@
   transform-origin: 55.5% 31.3%;
 }
 .kc-item[data-key="social"] {
-  transition-delay: 0.38s;
+  transition-delay: 0.21s;
 }
 
 .kc-item:focus-visible {
