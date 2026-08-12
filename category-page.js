@@ -1245,6 +1245,25 @@
       });
     listen(document, "focusin", wake, { passive: true });
 
+    // Which projects are close enough to be worth keeping on their own
+    // compositor layer — see the .is-near rule in category-page.css. The
+    // promotion used to be permanent and on every project at once, which
+    // had the browser holding every full-size texture on the page
+    // simultaneously. A screen's worth of margin either side means a
+    // project is promoted well before it can be seen moving, and
+    // released once it is nowhere near.
+    if (window.IntersectionObserver) {
+      var nearWatch = new IntersectionObserver(function (records) {
+        records.forEach(function (rec) {
+          rec.target.classList.toggle("is-near", rec.isIntersecting);
+        });
+      }, { rootMargin: "100% 0px" });
+      entries.forEach(function (entry) { nearWatch.observe(entry.item); });
+      onCleanup(function () { nearWatch.disconnect(); });
+    } else {
+      entries.forEach(function (entry) { entry.item.classList.add("is-near"); });
+    }
+
     // And the route that isn't an interaction at all: the page changing
     // shape by itself. A lazily-decoded image finally sizing its box, a
     // web font swapping in and reflowing a caption — each moves the
