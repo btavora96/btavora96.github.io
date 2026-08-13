@@ -28,7 +28,7 @@
   <link rel="preload" as="image" href="assets/keychains/SOCIAL-KC.webp" imagesrcset="assets/keychains/SOCIAL-KC-mob.webp 1000w, assets/keychains/SOCIAL-KC.webp 1950w" imagesizes="(max-width: 600px) 88vw, 50vw" type="image/webp" fetchpriority="high" />
   <link rel="preload" as="image" href="assets/keychains/WEB-KC.webp" imagesrcset="assets/keychains/WEB-KC-mob.webp 1000w, assets/keychains/WEB-KC.webp 1950w" imagesizes="(max-width: 600px) 88vw, 50vw" type="image/webp" fetchpriority="high" />
   <link rel="preload" as="image" href="assets/keychains/STAR-KC.webp" imagesrcset="assets/keychains/STAR-KC-mob.webp 1000w, assets/keychains/STAR-KC.webp 1950w" imagesizes="(max-width: 600px) 88vw, 50vw" type="image/webp" fetchpriority="high" />
-  <link rel="stylesheet" href="page.css?v=29" />
+  <link rel="stylesheet" href="page.css?v=30" />
   <link rel="stylesheet" href="components/keychains/keychain-cluster.css?v=19" />
   <link rel="stylesheet" href="transition.css?v=6" />
   <noscript><style>body { opacity: 1 !important; }</style></noscript>
@@ -89,6 +89,16 @@
     <p>I’m Bárbara Távora, an Art Director &amp; Graphic Designer working across branding, digital, social, and everything in between.</p>
     <p>Driven by a strong visual culture and a healthy obsession with craft, I create narratives with character, where every detail has a role.</p>
     <p class="hello-note">This website was made by me.</p>
+
+    <!-- Temporário: abaixo dos 700px é isto que aparece, em vez dos três
+         parágrafos acima. Os keychains continuam à vista e a baloiçar mas
+         não navegam — ver o bloco "Telemóvel em espera" no fim de
+         page.css, que faz as duas coisas. Para voltar ao normal, apagar
+         esse bloco e estas duas linhas; não há mais nada a desfazer.
+         Div e não <p>, porque `.hello-box p` bate `.info-heading` na
+         especificidade e comia-lhe o tamanho de letra. -->
+    <div class="info-heading desktop-hint-heading">Hello! :-)</div>
+    <p class="desktop-hint">Please check my website on desktop mode for better visualization.</p>
   </div>
 
   <div class="info-box contact-box">

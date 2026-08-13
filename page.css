@@ -362,3 +362,66 @@ body.kc-settled .contact-box {
       url("assets/page-bg-mob.webp");
   }
 }
+
+
+/* --------------------------------------------------------------------
+   TELEMÓVEL EM ESPERA — temporário.
+
+   O telemóvel ainda não está afinado, por isso abaixo dos 700px a
+   homepage passa a ser a única página: mostra o cluster, o fundo, o
+   botão de contacto e um aviso a pedir para abrir no computador. A
+   apresentação de três parágrafos fica escondida, e os keychains, apesar
+   de continuarem à vista e a baloiçar, deixam de navegar.
+
+   São os keychains que fazem a navegação através de `.kc-hitlayer` — as
+   âncoras por baixo têm pointer-events:none e nunca recebem o toque
+   (keychain-cluster.js, ~linha 636). Desligar essa camada chega, e não
+   obriga a mexer no JavaScript. O teclado continua a funcionar, para
+   quem navegue assim.
+
+   PARA DESFAZER: apagar este bloco inteiro, e as duas linhas marcadas
+   "Temporário" em index.html. Não há mais nada.
+
+   Está no fim do ficheiro e só acrescenta regras novas — nenhuma regra
+   existente é tocada, a nenhuma largura.
+   -------------------------------------------------------------------- */
+.desktop-hint-heading,
+.desktop-hint {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  /* O :not() não é decorativo. Sem ele esta regra também apanhava o
+     aviso — é um <p> dentro de .hello-box como os outros — e `.hello-box
+     > p` tem mais especificidade que `.desktop-hint`, por isso o
+     display:block abaixo perdia e não aparecia nada. */
+  .hello-box > h1.info-heading,
+  .hello-box > p:not(.desktop-hint) {
+    display: none;
+  }
+
+  .desktop-hint-heading {
+    display: block;
+  }
+
+  .desktop-hint {
+    display: block;
+    /* `.hello-box p` está desligado acima, por isso o tamanho e a
+       entrelinha que os parágrafos traziam têm de ser ditos aqui. */
+    font-size: 1rem;
+    line-height: 1.75;
+    text-align: center;
+    margin: 0;
+  }
+
+  /* "Say hello! Let's work together." sai daqui: com a apresentação
+     escondida, ficava a ser a única frase solta na página além do aviso,
+     e desviava dele. No desktop mantém-se. */
+  .contact-subtitle {
+    display: none;
+  }
+
+  .kc-hitlayer {
+    pointer-events: none;
+  }
+}
